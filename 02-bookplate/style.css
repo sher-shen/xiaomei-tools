@@ -1,0 +1,73 @@
+@font-face{
+  font-family:"MaShan";
+  src:url("fonts/MaShanZheng-Regular.woff2") format("woff2");
+  font-display:swap;
+}
+:root{
+  --paper:#f3ead2; --paper2:#ebdfbf; --ink:#2b2622; --ink2:#6b5f50; --red:#b3261e; --line:#cdbf9c;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:"Songti SC","STSong","Noto Serif SC",serif;
+  line-height:1.6;
+  padding:0 16px env(safe-area-inset-bottom);
+}
+.top{text-align:center;padding:28px 0 8px}
+.top h1{font-family:"MaShan","Songti SC",serif;font-weight:400;font-size:40px;margin:0;letter-spacing:.12em}
+.sub{margin:4px 0 0;color:var(--ink2);font-size:14px;letter-spacing:.2em}
+.wrap{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+.panel{background:var(--paper2);border:1px solid var(--line);border-radius:4px;padding:16px;box-shadow:inset 0 0 0 4px var(--paper),inset 0 0 0 5px var(--line)}
+.panel{padding:22px}
+.row2{display:grid;grid-template-columns:1fr 1.4fr;gap:12px}
+.field{display:block;margin-bottom:12px}
+.field>span{display:block;font-size:14px;margin-bottom:4px;color:var(--ink)}
+.field em{font-style:normal;color:var(--ink2);font-size:12px;margin-left:6px}
+input,textarea{
+  width:100%;font:inherit;font-size:16px;color:var(--ink);background:var(--paper);
+  border:1px solid var(--line);border-radius:3px;padding:8px 10px;outline:none;
+}
+input:focus,textarea:focus{border-color:var(--red)}
+textarea{resize:vertical;min-height:130px}
+.hint{font-size:12px;color:var(--ink2);margin:-6px 0 10px;min-height:1em}
+.hint.warn{color:var(--red)}
+.books{display:flex;flex-direction:column;gap:2px;max-height:300px;overflow:auto;border:1px dashed var(--line);border-radius:3px;padding:4px 8px;background:var(--paper)}
+.books .empty{color:var(--ink2);font-size:13px;margin:8px 0}
+.brow{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px dotted var(--line)}
+.brow:last-child{border-bottom:0}
+.brow .t{flex:1;min-width:0;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stars{display:flex}
+.stars button{background:none;border:0;padding:4px 2px;font-size:20px;line-height:1;color:#bfb08a;cursor:pointer;min-width:28px;min-height:32px}
+.stars button.on{color:var(--red)}
+.best{display:flex;align-items:center;gap:3px;font-size:12px;color:var(--ink2);cursor:pointer;white-space:nowrap}
+.best input{width:auto;accent-color:var(--red)}
+.seg{display:flex;border:1px solid var(--ink);border-radius:3px;overflow:hidden}
+.seg button{flex:1;font:inherit;font-size:15px;padding:9px;border:0;background:transparent;color:var(--ink);cursor:pointer}
+.seg button.on{background:var(--ink);color:var(--paper)}
+.actions{display:flex;gap:10px}
+button.ghost{font:inherit;font-size:14px;padding:8px 16px;background:transparent;border:1px solid var(--ink2);color:var(--ink);border-radius:3px;cursor:pointer}
+button.primary{
+  display:block;width:100%;max-width:420px;margin:12px auto 0;font:inherit;font-size:18px;letter-spacing:.3em;
+  padding:12px;background:var(--red);color:#fbf3df;border:0;border-radius:3px;cursor:pointer;
+}
+button:active{opacity:.8}
+.stage{text-align:center}
+.canvas-box{background:#d9ccaa;padding:12px;border-radius:4px;display:inline-block;max-width:100%}
+#cv{display:block;max-width:100%;height:auto;box-shadow:0 4px 14px rgba(60,40,10,.3);background:var(--paper)}
+.status{font-size:12px;color:var(--ink2);margin:8px 0 0}
+.foot{text-align:center;font-size:12px;color:var(--ink2);padding:24px 0 32px}
+.foot p{margin:2px 0}
+.foot a{color:var(--red)}
+.overlay{position:fixed;inset:0;background:rgba(30,24,16,.94);z-index:50;display:flex;flex-direction:column}
+.overlay[hidden]{display:none}
+.ov-bar{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;color:#f3ead2;font-size:16px;letter-spacing:.2em}
+.ov-bar button{font:inherit;font-size:14px;padding:6px 14px;background:transparent;border:1px solid #f3ead2;color:#f3ead2;border-radius:3px}
+.ov-body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:0 16px 24px;text-align:center}
+.ov-body img{max-width:100%;height:auto;-webkit-touch-callout:default;-webkit-user-select:auto;user-select:auto}
+@media (min-width:860px){
+  .wrap{flex-direction:row;align-items:flex-start}
+  .panel{flex:0 0 400px}
+  .stage{flex:1;position:sticky;top:12px}
+  #cv{max-height:calc(100vh - 150px);width:auto}
+}

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>小美的小工具</title>
+<style>
+:root{--paper:#f6f1e6;--card:#fbf8f0;--ink:#2a2826;--ink2:#6b655c;--line:#ddd3bf;--red:#b8372b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"Songti SC","STSong","Noto Serif CJK SC","Noto Serif SC",serif;line-height:1.6;padding:0 16px 40px}
+header{text-align:center;padding:36px 0 12px}
+h1{margin:0;font-size:28px;letter-spacing:.3em;font-weight:600}
+h1::after{content:"";display:block;width:32px;height:3px;background:var(--red);margin:10px auto 0}
+p.sub{color:var(--ink2);font-size:14px;margin:8px 0 0}
+main{max-width:560px;margin:16px auto 0;display:grid;gap:12px}
+a.card{display:block;text-decoration:none;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:16px 18px;border-left:4px solid var(--red)}
+a.card:active{background:#f1e8d6}
+.t{font-size:19px;font-weight:600}
+.d{font-size:13px;color:var(--ink2);margin-top:2px}
+footer{text-align:center;color:var(--ink2);font-size:12px;margin-top:28px}
+</style>
+</head>
+<body>
+<header><h1>小工具集</h1><p class="sub">纯本地运行 · 无需网络 · 图片不上传</p></header>
+<main>
+  <a class="card" href="01-shufa-wallpaper/"><div class="t">书法壁纸</div><div class="d">书法壁纸 · 印章 · 节气</div></a>
+  <a class="card" href="02-bookplate/"><div class="t">藏书票</div><div class="d">年度读书藏书票</div></a>
+  <a class="card" href="03-crochet-chart/"><div class="t">钩针图纸</div><div class="d">图片转像素格图纸，逐行读针</div></a>
+  <a class="card" href="00-sandbox-test/"><div class="t">沙箱能力测试</div><div class="d">检测小红书小工具环境的上传、导出、字体等能力</div></a>
+</main>
+<footer>墨色 · 米白 · 朱红</footer>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>书法壁纸生成器</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <h1>书法壁纸</h1>
+  <p class="sub">一句诗，一方印，一张壁纸</p>
+</header>
+
+<main>
+  <!-- 预览 -->
+  <section class="preview-wrap">
+    <canvas id="cv" aria-label="壁纸预览"></canvas>
+    <p id="warn" class="warn" hidden></p>
+    <div class="actions">
+      <button id="btnSave" class="primary" type="button">保存图片</button>
+    </div>
+  </section>
+
+  <!-- 控件 -->
+  <section class="panel">
+    <h2>节气</h2>
+    <div class="row">
+      <select id="term" aria-label="节气"></select>
+      <button id="btnTerm" type="button">一键填入</button>
+    </div>
+    <p id="termHint" class="hint"></p>
+
+    <h2>文字</h2>
+    <label class="lab" for="text">正文（换行即分列）</label>
+    <textarea id="text" rows="4" placeholder="输入一句话或一首诗"></textarea>
+    <label class="lab" for="sig">落款（可空）</label>
+    <input id="sig" type="text" placeholder="如：小美 · 寒露" maxlength="16">
+    <label class="check"><input id="keepPunc" type="checkbox"> 保留标点</label>
+
+    <h2>字体</h2>
+    <div class="seg" id="segFont">
+      <label><input type="radio" name="font" value="MaShanZheng" checked><span>马善政·楷</span></label>
+      <label><input type="radio" name="font" value="ZhiMangXing"><span>志莽行·行</span></label>
+      <label><input type="radio" name="font" value="LiuJianMaoCao"><span>刘建毛草·草</span></label>
+      <label><input type="radio" name="font" value="LongCang"><span>龙藏·行</span></label>
+    </div>
+
+    <h2>版式</h2>
+    <div class="seg" id="segSize">
+      <label><input type="radio" name="size" value="1170x2532" checked><span>手机壁纸</span></label>
+      <label><input type="radio" name="size" value="1242x1656"><span>小红书 3:4</span></label>
+      <label><input type="radio" name="size" value="1080x1080"><span>方形</span></label>
+    </div>
+    <div class="seg" id="segLayout">
+      <label><input type="radio" name="layout" value="v" checked><span>竖排 右起</span></label>
+      <label><input type="radio" name="layout" value="h"><span>横排</span></label>
+    </div>
+
+    <h2>背景</h2>
+    <div class="seg" id="segBg">
+      <label><input type="radio" name="bg" value="xuan" checked><span>宣纸米白</span></label>
+      <label><input type="radio" name="bg" value="ink"><span>淡墨灰</span></label>
+      <label><input type="radio" name="bg" value="juan"><span>绢黄</span></label>
+      <label><input type="radio" name="bg" value="night"><span>夜墨黑</span></label>
+    </div>
+
+    <label class="lab" for="scale">字号微调 <b id="scaleVal">100%</b></label>
+    <input id="scale" type="range" min="50" max="130" value="100">
+
+    <h2>闲章</h2>
+    <label class="check"><input id="sealOn" type="checkbox" checked> 在落款下方盖章</label>
+    <div class="row">
+      <input id="sealText" type="text" maxlength="6" placeholder="印文 1–6 字（空则取落款首字）" aria-label="印文">
+      <select id="sealPreset" aria-label="常用印文"><option value="">常用印文</option></select>
+    </div>
+    <div class="seg mini" id="segSeal">
+      <label><input type="radio" name="seal" value="zhu" checked><span>朱文</span></label>
+      <label><input type="radio" name="seal" value="bai"><span>白文</span></label>
+    </div>
+    <label class="lab" for="sealShape">印形</label>
+    <select id="sealShape">
+      <option value="square">方形</option><option value="strip">竖长条</option><option value="circle">圆形</option>
+      <option value="ellipse">椭圆</option><option value="gourd">葫芦形</option><option value="stone">随形</option>
+    </select>
+    <div class="seg mini" id="segColor">
+      <label><input type="radio" name="sealColor" value="cinnabar" checked><span>朱砂红</span></label>
+      <label><input type="radio" name="sealColor" value="orange"><span>橘红</span></label>
+      <label><input type="radio" name="sealColor" value="brown"><span>古褐红</span></label>
+    </div>
+    <label class="lab" for="aging">做旧程度 <b id="agingVal">45</b></label>
+    <input id="aging" type="range" min="0" max="100" value="45">
+    <div class="row">
+      <canvas id="sealPrev" width="240" height="240" aria-label="印章预览"></canvas>
+      <div>
+        <button id="btnSeal" type="button">仅导出印章 PNG</button>
+        <button id="btnCard" type="button" style="margin-top:8px">导出印蜕卡片</button>
+        <p class="hint">字体排印闲章，非篆刻。透明 PNG 600×600；卡片 3:4 适合分享。</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>所用字体均为 SIL OFL 开源字体：
+    <a href="fonts/mashanzheng-OFL.txt">马善政</a> ·
+    <a href="fonts/zhimangxing-OFL.txt">志莽行</a> ·
+    <a href="fonts/liujianmaocao-OFL.txt">刘建毛草</a> ·
+    <a href="fonts/longcang-OFL.txt">龙藏</a>
+  </p>
+  <p>全部在本地生成，不上传任何内容。</p>
+</footer>
+
+<!-- 保存层：长按图片保存 -->
+<div id="overlay" class="overlay" hidden>
+  <p class="tip">长按图片保存</p>
+  <img id="outImg" alt="生成的图片">
+  <button id="btnClose" type="button">关闭</button>
+</div>
+
+<script src="charset.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

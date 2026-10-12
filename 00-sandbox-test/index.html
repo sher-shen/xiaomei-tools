@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>小红书小工具能力测试</title>
+<style>
+@font-face{font-family:"XMTest";src:url("fonts/test.woff2") format("woff2");font-display:block}
+:root{--paper:#f6f1e6;--card:#fbf8f0;--ink:#2a2826;--ink2:#6b655c;--line:#ddd3bf;--red:#b8372b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"Songti SC","Noto Serif SC",serif;line-height:1.6;padding:14px 14px 40px;max-width:640px;margin:0 auto}
+h1{font-size:22px;text-align:center;letter-spacing:.2em;margin:16px 0 4px}
+.sub{text-align:center;color:var(--ink2);font-size:13px;margin:0 0 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:12px;margin:10px 0}
+h2{font-size:16px;margin:0 0 6px;border-left:3px solid var(--red);padding-left:8px}
+.res{font-size:13px;margin:3px 0;word-break:break-all}
+.btn{font:inherit;font-size:15px;border:1px solid var(--ink);background:transparent;color:var(--ink);padding:8px 14px;border-radius:4px;min-height:40px;margin:4px 6px 4px 0}
+.btn.primary{background:var(--red);border-color:var(--red);color:#fff}
+img.th{max-width:140px;max-height:140px;border:1px solid var(--line);display:block;margin:6px 0}
+#fontdemo{font-family:"XMTest",serif;font-size:40px;margin:4px 0}
+.ov{position:fixed;inset:0;background:#1b1a18;z-index:9;display:flex;flex-direction:column}
+.ov[hidden]{display:none}
+.ov .bar{color:#f6f1e6;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;font-size:14px}
+.ov .bar button{color:#f6f1e6;border-color:#f6f1e6;margin:0}
+.ov .body{flex:1;overflow:auto;text-align:center}
+.ov img{max-width:100%;background:#fff}
+</style>
+</head>
+<body>
+<h1>能力测试</h1>
+<p class="sub">在小红书小工具里打开本页，截图或点“复制报告”发给我</p>
+
+<div class="card" id="t1"><h2>1 照片上传</h2>
+  <input type="file" id="f" accept="image/*">
+  <div id="r1"></div></div>
+
+<div class="card" id="t2"><h2>2 Canvas 导出</h2>
+  <button class="btn" id="b2">运行 Canvas 测试</button>
+  <div id="r2"></div></div>
+
+<div class="card" id="t3"><h2>3 本地字体加载</h2>
+  <div id="fontdemo">书法测试</div>
+  <div id="r3"></div></div>
+
+<div class="card" id="t4"><h2>4 存储与环境</h2><div id="r4"></div></div>
+
+<div class="card"><h2>5 报告</h2>
+  <button class="btn primary" id="copy">复制报告</button>
+  <button class="btn" id="rerun">重新运行全部</button>
+  <div id="r5" class="res"></div>
+  <textarea id="rep" rows="8" style="width:100%;font-size:12px;margin-top:6px" readonly></textarea></div>
+
+<div class="ov" id="ov" hidden><div class="bar"><span>长按图片，选择“保存图片”</span><button class="btn" id="cl">关闭</button></div><div class="body"><img id="oi" alt="测试图"></div></div>
+
+<script>
+(function () {
+  'use strict';
+  var R = {};   // key -> [{ok,text}]
+  var $ = function (i) { return document.getElementById(i); };
+  function add(group, ok, text) {
+    (R[group] = R[group] || []).push({ ok: ok, text: text });
+    var d = document.createElement('div');
+    d.className = 'res'; d.textContent = (ok ? '✅ ' : '❌ ') + text;
+    $(group).appendChild(d);
+  }
+  function reset(group) { R[group] = []; $(group).innerHTML = ''; }
+  function err(e) { return (e && (e.name ? e.name + ': ' : '') + (e.message || e)) || String(e); }
+
+  // 1 照片上传
+  $('f').addEventListener('change', function (e) {
+    reset('r1');
+    var f = e.target.files && e.target.files[0];
+    if (!f) { add('r1', false, '未选择文件'); return; }
+    add('r1', true, '读取到文件 ' + (f.name || '?') + '，' + f.type + '，' + f.size + ' 字节');
+    var url;
+    try { url = URL.createObjectURL(f); } catch (x) { add('r1', false, 'createObjectURL 失败 ' + err(x)); return; }
+    var img = new Image();
+    img.className = 'th';
+    img.onload = function () {
+      add('r1', true, '图片解码成功，尺寸 ' + img.naturalWidth + '×' + img.naturalHeight);
+      $('r1').appendChild(img);
+    };
+    img.onerror = function () { add('r1', false, '图片解码失败'); };
+    img.src = url;
+  });
+
+  // 2 Canvas 导出
+  function makeCanvas() {
+    var c = document.createElement('canvas'); c.width = 300; c.height = 200;
+    var g = c.getContext('2d');
+    g.fillStyle = '#f6f1e6'; g.fillRect(0, 0, 300, 200);
+    g.fillStyle = '#b8372b'; g.fillRect(20, 20, 80, 80);
+    g.fillStyle = '#2a2826'; g.font = '28px serif'; g.fillText('能力测试', 120, 110);
+    return c;
+  }
+  function runCanvas() {
+    reset('r2');
+    var c;
+    try { c = makeCanvas(); add('r2', true, 'Canvas 2D 绘制成功'); } catch (e) { add('r2', false, 'Canvas 绘制失败 ' + err(e)); return; }
+    try {
+      var du = c.toDataURL('image/png');
+      add('r2', du.indexOf('data:image/png') === 0, 'toDataURL ' + (du.length) + ' 字符');
+    } catch (e) { add('r2', false, 'toDataURL 异常 ' + err(e)); }
+    try {
+      c.toBlob(function (b) {
+        if (!b) { add('r2', false, 'toBlob 返回 null'); return; }
+        add('r2', true, 'toBlob 成功，' + b.size + ' 字节');
+        try {
+          var url = URL.createObjectURL(b), a = document.createElement('a');
+          a.href = url; a.download = 'sandbox-test.png';
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          add('r2', true, '<a download> 点击未抛异常（是否真的保存了文件请你手动确认）');
+        } catch (e) { add('r2', false, '<a download> 抛异常 ' + err(e)); }
+        try {
+          $('oi').src = URL.createObjectURL(b); $('ov').hidden = false;
+          add('r2', true, '已打开全屏 <img>：请长按图片，看有没有“保存图片”（需你手动确认）');
+        } catch (e) { add('r2', false, '全屏 img 失败 ' + err(e)); }
+      }, 'image/png');
+    } catch (e) { add('r2', false, 'toBlob 异常 ' + err(e)); }
+  }
+  $('b2').addEventListener('click', runCanvas);
+  $('cl').addEventListener('click', function () { $('ov').hidden = true; });
+
+  // 3 字体
+  function runFont() {
+    reset('r3');
+    if (!document.fonts || !document.fonts.load) { add('r3', false, '不支持 document.fonts.load'); return; }
+    var t0 = Date.now();
+    document.fonts.load('40px "XMTest"', '书法测试').then(function (list) {
+      var ms = Date.now() - t0;
+      var ok = list && list.length > 0;
+      add('r3', ok, 'document.fonts.load ' + (ok ? '成功' : '返回空') + '，耗时 ' + ms + 'ms，已加载 ' + (list ? list.length : 0) + ' 个');
+      try { add('r3', document.fonts.check('40px "XMTest"', '书法测试'), 'document.fonts.check'); } catch (e) { add('r3', false, 'check 异常 ' + err(e)); }
+    }).catch(function (e) { add('r3', false, '字体加载失败 ' + err(e)); });
+  }
+
+  // 4 存储与环境
+  function runEnv() {
+    reset('r4');
+    ['localStorage', 'sessionStorage'].forEach(function (n) {
+      try {
+        var s = window[n]; s.setItem('xm_t', '1');
+        var v = s.getItem('xm_t'); s.removeItem('xm_t');
+        add('r4', v === '1', n + ' 读写' + (v === '1' ? '正常' : '失败'));
+      } catch (e) { add('r4', false, n + ' 不可用 ' + err(e)); }
+    });
+    try {
+      if (!window.indexedDB) { add('r4', false, 'indexedDB 不存在'); }
+      else {
+        var q = indexedDB.open('xm_test', 1);
+        q.onupgradeneeded = function () { q.result.createObjectStore('s'); };
+        q.onsuccess = function () { add('r4', true, 'IndexedDB 可打开'); try { q.result.close(); indexedDB.deleteDatabase('xm_test'); } catch (e) {} };
+        q.onerror = function () { add('r4', false, 'IndexedDB 打开失败 ' + err(q.error)); };
+        q.onblocked = function () { add('r4', false, 'IndexedDB 被阻塞'); };
+      }
+    } catch (e) { add('r4', false, 'IndexedDB 异常 ' + err(e)); }
+    add('r4', typeof navigator.share === 'function', 'navigator.share ' + (typeof navigator.share === 'function' ? '存在' : '不存在'));
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText('xm-test').then(function () { add('r4', true, '剪贴板写入成功'); },
+        function (e) { add('r4', false, '剪贴板写入被拒 ' + err(e)); });
+    } else { add('r4', false, 'navigator.clipboard.writeText 不存在'); }
+    add('r4', true, 'userAgent: ' + navigator.userAgent);
+    add('r4', true, '屏幕 ' + screen.width + '×' + screen.height + '，窗口 ' + innerWidth + '×' + innerHeight + '，devicePixelRatio ' + devicePixelRatio);
+    add('r4', true, '协议/地址: ' + location.protocol + '//' + (location.host || '(空)'));
+  }
+
+  // 5 报告
+  var names = { r1: '1 照片上传', r2: '2 Canvas 导出', r3: '3 本地字体', r4: '4 存储与环境' };
+  function report() {
+    var L = ['小红书小工具能力测试报告  ' + new Date().toLocaleString()];
+    ['r1', 'r2', 'r3', 'r4'].forEach(function (k) {
+      L.push('', '【' + names[k] + '】');
+      if (!(R[k] && R[k].length)) L.push('（尚无结果）');
+      (R[k] || []).forEach(function (x) { L.push((x.ok ? '✅ ' : '❌ ') + x.text); });
+    });
+    return L.join('\n');
+  }
+  $('copy').addEventListener('click', function () {
+    var t = report(); $('rep').value = t;
+    function fallback(why) {
+      try {
+        $('rep').focus(); $('rep').select();
+        var ok = document.execCommand && document.execCommand('copy');
+        $('r5').textContent = ok ? '✅ 已复制（execCommand）' : '❌ 自动复制失败（' + why + '），请长按下方文本框手动复制';
+      } catch (e) { $('r5').textContent = '❌ 自动复制失败（' + err(e) + '），请长按下方文本框手动复制'; }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).then(function () { $('r5').textContent = '✅ 已复制报告到剪贴板'; }, function (e) { fallback(err(e)); });
+    } else fallback('无 clipboard API');
+  });
+  function runAll() { runFont(); runEnv(); }
+  $('rerun').addEventListener('click', function () { runAll(); $('rep').value = ''; $('r5').textContent = ''; });
+  runAll();
+})();
+</script>
+</body>
+</html>
