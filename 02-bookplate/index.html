@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>年度读书藏书票</title>
 <meta name="description" content="输入年度书单，生成古籍风藏书票与书单小票，纯本地生成，不上传任何数据。">
+<meta name="theme-color" content="#efe6d2">
+<meta property="og:type" content="website">
+<meta property="og:title" content="年度读书藏书票">
+<meta property="og:description" content="一年读过的书，刻成一枚藏书印记。古籍风藏书票与书单小票，纯本地生成。">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iOCIgZmlsbD0iI2VmZTZkMiIvPjxyZWN0IHg9IjgiIHk9IjgiIHdpZHRoPSI0OCIgaGVpZ2h0PSI0OCIgZmlsbD0iI2IzMjYxZSIvPjxyZWN0IHg9IjEzIiB5PSIxMyIgd2lkdGg9IjM4IiBoZWlnaHQ9IjM4IiBmaWxsPSJub25lIiBzdHJva2U9IiNlZmU2ZDIiIHN0cm9rZS13aWR0aD0iMi41Ii8+PHJlY3QgeD0iMjEiIHk9IjIwIiB3aWR0aD0iMjIiIGhlaWdodD0iNSIgZmlsbD0iI2VmZTZkMiIvPjxyZWN0IHg9IjI5LjUiIHk9IjIwIiB3aWR0aD0iNSIgaGVpZ2h0PSIyNiIgZmlsbD0iI2VmZTZkMiIvPjxyZWN0IHg9IjIxIiB5PSIzNCIgd2lkdGg9IjIyIiBoZWlnaHQ9IjQiIGZpbGw9IiNlZmU2ZDIiLz48L3N2Zz4=">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -16,34 +21,43 @@
 <main class="wrap">
   <section class="panel" aria-label="填写">
     <div class="row2">
-      <label class="field">
+      <label class="field" for="year">
         <span>年份</span>
-        <input id="year" type="number" inputmode="numeric" min="1900" max="2200" value="2026">
+        <input id="year" type="number" inputmode="numeric" min="1900" max="2200">
       </label>
-      <label class="field">
+      <label class="field" for="owner">
         <span>藏书人</span>
         <input id="owner" type="text" maxlength="12" placeholder="如：小美" autocomplete="off">
       </label>
     </div>
 
-    <label class="field">
+    <label class="field" for="list">
       <span>书单 <em>每行一本，格式「书名 / 作者」，作者可省，最多 30 本</em></span>
-      <textarea id="list" rows="7" spellcheck="false" placeholder="红楼梦 / 曹雪芹&#10;浮生六记 / 沈复&#10;呐喊"></textarea>
+      <textarea id="list" rows="7" aria-describedby="count" spellcheck="false" placeholder="红楼梦 / 曹雪芹&#10;浮生六记 / 沈复&#10;呐喊"></textarea>
     </label>
-    <div class="hint" id="count"></div>
+    <div class="hint" id="count" aria-live="polite"></div>
 
-    <div class="field">
-      <span>评星与年度之书 <em>点星打分，再点同星取消；圈选一本为年度之书</em></span>
+    <div class="field" role="group" aria-labelledby="lb-books">
+      <span id="lb-books">评星与年度之书 <em>点星打分，再点同星取消；圈选一本为年度之书</em></span>
       <div id="books" class="books"><p class="empty">填入书单后，这里会列出每本书。</p></div>
     </div>
 
-    <div class="field">
-      <span>样式</span>
-      <div class="seg" role="tablist">
-        <button type="button" id="tab-plate" class="on" data-tpl="plate">藏书票</button>
-        <button type="button" id="tab-receipt" data-tpl="receipt">书单小票</button>
+    <div class="field" role="group" aria-labelledby="lb-tpl">
+      <span id="lb-tpl">样式</span>
+      <div class="seg">
+        <button type="button" id="tab-plate" class="on" data-tpl="plate" aria-pressed="true">藏书票</button>
+        <button type="button" id="tab-receipt" data-tpl="receipt" aria-pressed="false">书单小票</button>
       </div>
     </div>
+    <div class="field" id="color-row" role="group" aria-labelledby="lb-color">
+      <span id="lb-color">藏书票配色</span>
+      <div class="seg">
+        <button type="button" id="th-paper" class="on" data-theme="paper" aria-pressed="true">古纸</button>
+        <button type="button" id="th-night" data-theme="night" aria-pressed="false">夜读</button>
+      </div>
+    </div>
+
+    <label class="best wm" for="nowm"><input type="checkbox" id="nowm">去掉水印</label>
 
     <div class="actions">
       <button type="button" id="demo" class="ghost">示例书单</button>
@@ -52,8 +66,8 @@
   </section>
 
   <section class="stage" aria-label="预览">
-    <div class="canvas-box"><canvas id="cv" width="1242" height="1656"></canvas></div>
-    <p class="status" id="status">正在备纸研墨……</p>
+    <div class="canvas-box"><canvas id="cv" width="1242" height="1656" role="img" aria-label="预览"></canvas></div>
+    <p class="status" id="status" role="status" aria-live="polite">正在备纸研墨……</p>
     <button type="button" id="save" class="primary">保存图片</button>
   </section>
 </main>
@@ -63,7 +77,7 @@
   <p>题字字体「马善政楷书 Ma Shan Zheng」，依 SIL Open Font License 1.1 授权，<a href="fonts/mashanzheng-OFL.txt">查看授权全文</a>。</p>
 </footer>
 
-<div id="overlay" class="overlay" hidden>
+<div id="overlay" class="overlay" hidden role="dialog" aria-modal="true" aria-label="长按图片保存">
   <div class="ov-bar"><span>长按图片保存</span><button type="button" id="ov-close">关闭</button></div>
   <div class="ov-body"><img id="ov-img" alt="生成的图片，长按保存"></div>
 </div>

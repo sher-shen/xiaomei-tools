@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>书法壁纸生成器</title>
+<meta name="description" content="一句诗，一方印，一张壁纸。输入文字，选毛笔字体与闲章，在本地生成书法壁纸与印蜕卡片，不上传任何内容。">
+<meta name="theme-color" content="#f4efe6">
+<meta property="og:type" content="website">
+<meta property="og:title" content="书法壁纸生成器">
+<meta property="og:description" content="一句诗，一方印，一张壁纸。毛笔字体 + 闲章 + 节气，纯本地生成。">
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3QgeD0iNCIgeT0iNCIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIgZmlsbD0iI2IzMjYxZSIvPjx0ZXh0IHg9IjMyIiB5PSI0NiIgZm9udC1zaXplPSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiIgZm9udC1mYW1pbHk9InNlcmlmIj7kuaY8L3RleHQ+PC9zdmc+">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -15,10 +21,11 @@
 <main>
   <!-- 预览 -->
   <section class="preview-wrap">
-    <canvas id="cv" aria-label="壁纸预览"></canvas>
+    <div class="cvbox"><canvas id="cv" aria-label="壁纸预览"></canvas><div id="fontLoading" class="loading" role="status" hidden>字体加载中…</div></div>
     <p id="warn" class="warn" hidden></p>
     <div class="actions">
       <button id="btnSave" class="primary" type="button">保存图片</button>
+      <button id="btnReset" class="link" type="button">恢复默认</button>
     </div>
   </section>
 
@@ -26,7 +33,8 @@
   <section class="panel">
     <h2>节气</h2>
     <div class="row">
-      <select id="term" aria-label="节气"></select>
+      <label class="sr" for="term">选择节气</label>
+      <select id="term"></select>
       <button id="btnTerm" type="button">一键填入</button>
     </div>
     <p id="termHint" class="hint"></p>
@@ -37,9 +45,10 @@
     <label class="lab" for="sig">落款（可空）</label>
     <input id="sig" type="text" placeholder="如：小美 · 寒露" maxlength="16">
     <label class="check"><input id="keepPunc" type="checkbox"> 保留标点</label>
+    <label class="check"><input id="noMark" type="checkbox"> 去掉水印</label>
 
     <h2>字体</h2>
-    <div class="seg" id="segFont">
+    <div class="seg" id="segFont" role="group" aria-label="字体">
       <label><input type="radio" name="font" value="MaShanZheng" checked><span>马善政·楷</span></label>
       <label><input type="radio" name="font" value="ZhiMangXing"><span>志莽行·行</span></label>
       <label><input type="radio" name="font" value="LiuJianMaoCao"><span>刘建毛草·草</span></label>
@@ -47,18 +56,18 @@
     </div>
 
     <h2>版式</h2>
-    <div class="seg" id="segSize">
+    <div class="seg" id="segSize" role="group" aria-label="尺寸">
       <label><input type="radio" name="size" value="1170x2532" checked><span>手机壁纸</span></label>
       <label><input type="radio" name="size" value="1242x1656"><span>小红书 3:4</span></label>
       <label><input type="radio" name="size" value="1080x1080"><span>方形</span></label>
     </div>
-    <div class="seg" id="segLayout">
+    <div class="seg" id="segLayout" role="group" aria-label="排版">
       <label><input type="radio" name="layout" value="v" checked><span>竖排 右起</span></label>
       <label><input type="radio" name="layout" value="h"><span>横排</span></label>
     </div>
 
     <h2>背景</h2>
-    <div class="seg" id="segBg">
+    <div class="seg" id="segBg" role="group" aria-label="背景">
       <label><input type="radio" name="bg" value="xuan" checked><span>宣纸米白</span></label>
       <label><input type="radio" name="bg" value="ink"><span>淡墨灰</span></label>
       <label><input type="radio" name="bg" value="juan"><span>绢黄</span></label>
@@ -71,10 +80,12 @@
     <h2>闲章</h2>
     <label class="check"><input id="sealOn" type="checkbox" checked> 在落款下方盖章</label>
     <div class="row">
-      <input id="sealText" type="text" maxlength="6" placeholder="印文 1–6 字（空则取落款首字）" aria-label="印文">
-      <select id="sealPreset" aria-label="常用印文"><option value="">常用印文</option></select>
+      <label class="sr" for="sealText">印文</label>
+      <input id="sealText" type="text" maxlength="6" placeholder="印文 1–6 字（空则取落款首字）">
+      <label class="sr" for="sealPreset">常用印文</label>
+      <select id="sealPreset"><option value="">常用印文</option></select>
     </div>
-    <div class="seg mini" id="segSeal">
+    <div class="seg mini" id="segSeal" role="group" aria-label="印章样式">
       <label><input type="radio" name="seal" value="zhu" checked><span>朱文</span></label>
       <label><input type="radio" name="seal" value="bai"><span>白文</span></label>
     </div>
@@ -83,7 +94,7 @@
       <option value="square">方形</option><option value="strip">竖长条</option><option value="circle">圆形</option>
       <option value="ellipse">椭圆</option><option value="gourd">葫芦形</option><option value="stone">随形</option>
     </select>
-    <div class="seg mini" id="segColor">
+    <div class="seg mini" id="segColor" role="group" aria-label="印泥颜色">
       <label><input type="radio" name="sealColor" value="cinnabar" checked><span>朱砂红</span></label>
       <label><input type="radio" name="sealColor" value="orange"><span>橘红</span></label>
       <label><input type="radio" name="sealColor" value="brown"><span>古褐红</span></label>
@@ -91,7 +102,7 @@
     <label class="lab" for="aging">做旧程度 <b id="agingVal">45</b></label>
     <input id="aging" type="range" min="0" max="100" value="45">
     <div class="row">
-      <canvas id="sealPrev" width="240" height="240" aria-label="印章预览"></canvas>
+      <canvas id="sealPrev" width="240" height="240" role="img" aria-label="印章预览"></canvas>
       <div>
         <button id="btnSeal" type="button">仅导出印章 PNG</button>
         <button id="btnCard" type="button" style="margin-top:8px">导出印蜕卡片</button>

@@ -56,37 +56,57 @@
   }
 
   /**
-   * k-means（Lab 空间，k-means++ 初始化，固定种子）
+   * 像素去重/降采样：相同颜色合并并记权重；独立色仍超过 maxUnique 时逐步量化（丢低位）。
+   * 返回 {colors:[[r,g,b],...], weights:[n,...]}
+   */
+  function dedupePixels(pixels, maxUnique) {
+    maxUnique = maxUnique || 3000;
+    for (var q = 0; q <= 7; q++) {
+      var map = {}, keys = [];
+      for (var i = 0; i < pixels.length; i++) {
+        var p = pixels[i];
+        var key = ((p[0] >> q) << 16) | ((p[1] >> q) << 8) | (p[2] >> q);
+        var e = map[key];
+        if (!e) { e = map[key] = [0, 0, 0, 0]; keys.push(key); }
+        e[0] += p[0]; e[1] += p[1]; e[2] += p[2]; e[3]++;
+      }
+      if (keys.length <= maxUnique || q === 7) {
+        return {
+          colors: keys.map(function (k) { var e = map[k]; return [Math.round(e[0] / e[3]), Math.round(e[1] / e[3]), Math.round(e[2] / e[3])]; }),
+          weights: keys.map(function (k) { return map[k][3]; })
+        };
+      }
+    }
+  }
+
+  /**
+   * k-means（Lab 空间，k-means++ 初始化，固定种子；先对像素去重加权，大图也很快）
    * pixels: [[r,g,b],...]  返回 RGB 调色板 [[r,g,b],...]（长度 <= k）
    */
   function kmeansPalette(pixels, k, seed, maxIter) {
     seed = seed == null ? 12345 : seed;
     maxIter = maxIter == null ? 15 : Math.min(15, maxIter);
-    var n = pixels.length;
-    if (!n) return [];
-    var labs = pixels.map(rgbToLab);
-    // 去重后的独立颜色数
-    var seen = {}, uniq = 0;
-    for (var i = 0; i < n; i++) {
-      var key = pixels[i][0] + ',' + pixels[i][1] + ',' + pixels[i][2];
-      if (!seen[key]) { seen[key] = 1; uniq++; }
+    if (!pixels.length) return [];
+    var dd0 = dedupePixels(pixels), cols = dd0.colors, wt = dd0.weights;
+    var n = cols.length;
+    var labs = cols.map(rgbToLab);
+    k = Math.max(1, Math.min(k, n));
+    var rnd = mulberry32(seed), i, j;
+    function pickWeighted(arr) {
+      var sum = 0;
+      for (var t = 0; t < n; t++) sum += arr[t];
+      if (sum <= 0) return Math.floor(rnd() * n);
+      var r = rnd() * sum, acc = 0;
+      for (t = 0; t < n; t++) { acc += arr[t]; if (acc >= r) return t; }
+      return n - 1;
     }
-    k = Math.max(1, Math.min(k, uniq));
-    var rnd = mulberry32(seed);
-    // k-means++
-    var centers = [labs[Math.floor(rnd() * n)].slice()];
-    var d2 = new Float64Array(n);
+    // k-means++（按权重）
+    var centers = [labs[pickWeighted(wt)].slice()];
+    var d2 = new Float64Array(n), pw = new Float64Array(n);
     for (i = 0; i < n; i++) d2[i] = labDist2(labs[i], centers[0]);
     while (centers.length < k) {
-      var sum = 0;
-      for (i = 0; i < n; i++) sum += d2[i];
-      var pick = 0;
-      if (sum <= 0) { pick = Math.floor(rnd() * n); }
-      else {
-        var r = rnd() * sum, acc = 0;
-        for (i = 0; i < n; i++) { acc += d2[i]; if (acc >= r) { pick = i; break; } }
-      }
-      var c = labs[pick].slice();
+      for (i = 0; i < n; i++) pw[i] = d2[i] * wt[i];
+      var c = labs[pickWeighted(pw)].slice();
       centers.push(c);
       for (i = 0; i < n; i++) { var dd = labDist2(labs[i], c); if (dd < d2[i]) d2[i] = dd; }
     }
@@ -95,7 +115,7 @@
       var changed = false;
       for (i = 0; i < n; i++) {
         var best = 0, bd = Infinity;
-        for (var j = 0; j < centers.length; j++) {
+        for (j = 0; j < centers.length; j++) {
           var d = labDist2(labs[i], centers[j]);
           if (d < bd) { bd = d; best = j; }
         }
@@ -103,19 +123,19 @@
       }
       var sums = centers.map(function () { return [0, 0, 0, 0]; });
       for (i = 0; i < n; i++) {
-        var s = sums[assign[i]];
-        s[0] += labs[i][0]; s[1] += labs[i][1]; s[2] += labs[i][2]; s[3]++;
+        var s = sums[assign[i]], w = wt[i];
+        s[0] += labs[i][0] * w; s[1] += labs[i][1] * w; s[2] += labs[i][2] * w; s[3] += w;
       }
       for (j = 0; j < centers.length; j++) {
         if (sums[j][3] > 0) centers[j] = [sums[j][0] / sums[j][3], sums[j][1] / sums[j][3], sums[j][2] / sums[j][3]];
       }
       if (!changed) break;
     }
-    // 用成员像素的 RGB 平均值作为色（避免 Lab 反变换），空簇丢弃
+    // 用成员像素的 RGB 加权平均作为色（避免 Lab 反变换），空簇丢弃
     var rs = centers.map(function () { return [0, 0, 0, 0]; });
     for (i = 0; i < n; i++) {
-      var q = rs[assign[i]];
-      q[0] += pixels[i][0]; q[1] += pixels[i][1]; q[2] += pixels[i][2]; q[3]++;
+      var q = rs[assign[i]], w2 = wt[i];
+      q[0] += cols[i][0] * w2; q[1] += cols[i][1] * w2; q[2] += cols[i][2] * w2; q[3] += w2;
     }
     var pal = [];
     rs.forEach(function (q) {
@@ -154,13 +174,16 @@
   /** 把每个像素分配到调色板最近色；dither 时用 Floyd–Steinberg。返回长度 w*h 的索引数组 */
   function assignPixels(pixels, w, h, palette, dither) {
     var pl = palette.map(rgbToLab);
+    var cache = {};
     function nearest(c) {
+      var ck = (c[0] << 16) | (c[1] << 8) | c[2];
+      if (cache[ck] !== undefined) return cache[ck];
       var l = rgbToLab(c), bi = 0, bd = Infinity;
       for (var j = 0; j < pl.length; j++) {
         var d = labDist2(l, pl[j]);
         if (d < bd) { bd = d; bi = j; }
       }
-      return bi;
+      return (cache[ck] = bi);
     }
     var out = new Array(w * h);
     if (!dither) {
@@ -172,7 +195,8 @@
       for (var x = 0; x < w; x++) {
         var idx = y * w + x, cur = buf[idx];
         var cc = [Math.max(0, Math.min(255, cur[0])), Math.max(0, Math.min(255, cur[1])), Math.max(0, Math.min(255, cur[2]))];
-        var b = nearest(cc);
+        var cr = [Math.round(cc[0]), Math.round(cc[1]), Math.round(cc[2])];
+        var b = nearest(cr);
         out[idx] = b;
         var err = [cc[0] - palette[b][0], cc[1] - palette[b][1], cc[2] - palette[b][2]];
         var spread = [[1, 0, 7 / 16], [-1, 1, 3 / 16], [0, 1, 5 / 16], [1, 1, 1 / 16]];
@@ -266,6 +290,105 @@
     return out;
   }
 
+
+  /**
+   * 清理孤立格：四邻（边角格取现有邻格，至少 2 个）都与自己异色的单个孤格，
+   * 并入出现最多的邻色（平局取编号小者）。基于原数组一次判定，返回新数组。
+   */
+  function cleanIsolated(indices, w, h) {
+    var out = indices.slice();
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        var me = indices[y * w + x], nb = [];
+        if (x > 0) nb.push(indices[y * w + x - 1]);
+        if (x < w - 1) nb.push(indices[y * w + x + 1]);
+        if (y > 0) nb.push(indices[(y - 1) * w + x]);
+        if (y < h - 1) nb.push(indices[(y + 1) * w + x]);
+        if (nb.length < 2) continue;
+        var iso = true, cnt = {};
+        for (var i = 0; i < nb.length; i++) {
+          if (nb[i] === me) { iso = false; break; }
+          cnt[nb[i]] = (cnt[nb[i]] || 0) + 1;
+        }
+        if (!iso) continue;
+        var best = -1, bc = 0;
+        Object.keys(cnt).map(Number).sort(function (a, b) { return a - b; }).forEach(function (c) {
+          if (cnt[c] > bc) { bc = cnt[c]; best = c; }
+        });
+        out[y * w + x] = best;
+      }
+    }
+    return out;
+  }
+
+  /**
+   * 换线统计。steps 为 tapestryRows / c2cDiagonals 的结果。
+   * perStep[i] = 该行（条）内换色次数；turns = 相邻两行（条）衔接处颜色不同的次数；
+   * total = 行内换色合计 + 衔接换色。
+   */
+  function colorChanges(steps) {
+    var per = [], within = 0, turns = 0;
+    steps.forEach(function (st, i) {
+      var n = Math.max(0, st.runs.length - 1);
+      per.push(n); within += n;
+      if (i > 0) {
+        var pr = steps[i - 1].runs;
+        if (pr[pr.length - 1].c !== st.runs[0].c) turns++;
+      }
+    });
+    var mx = 0, mi = 0;
+    per.forEach(function (n, i) { if (n > mx) { mx = n; mi = i; } });
+    return { perStep: per, within: within, turns: turns, total: within + turns, max: mx, maxIndex: mi };
+  }
+
+  /** 裁剪矩形。mode: 'square' 居中正方形；其他 = 原比例。返回 {sx,sy,sw,sh} */
+  function cropRect(w, h, mode) {
+    if (mode === 'square') {
+      var s = Math.min(w, h);
+      return { sx: Math.floor((w - s) / 2), sy: Math.floor((h - s) / 2), sw: s, sh: s };
+    }
+    return { sx: 0, sy: 0, sw: w, sh: h };
+  }
+
+  /**
+   * 图纸尺寸：按裁剪后比例由列数算行数；行数超过 maxRows 时按比例缩小列数，使行数 = maxRows。
+   * 返回 {w, h, adjusted}（adjusted 为 true 表示列数被改动）
+   */
+  function chartSize(cols, sw, sh, maxRows) {
+    maxRows = maxRows || 300;
+    var w = Math.max(1, Math.round(cols));
+    var h = Math.max(1, Math.round(w * sh / sw)), adjusted = false;
+    if (h > maxRows) {
+      h = maxRows;
+      w = Math.max(1, Math.min(w, Math.round(maxRows * sw / sh)));
+      adjusted = w !== Math.round(cols);
+    }
+    return { w: w, h: h, adjusted: adjusted };
+  }
+
+  /**
+   * 调色板重名处理：items=[{name,rgb}]（原地不改，返回新名字数组）。
+   * 重名组内按明度（Lab L）最深者加“深”、最浅者加“浅”前缀；仍重名则加序号。
+   */
+  function uniqueNames(items) {
+    var names = items.map(function (it) { return it.name; });
+    var groups = {};
+    names.forEach(function (n, i) { (groups[n] = groups[n] || []).push(i); });
+    Object.keys(groups).forEach(function (n) {
+      var g = groups[n];
+      if (g.length < 2) return;
+      g.sort(function (a, b) { return rgbToLab(items[a].rgb)[0] - rgbToLab(items[b].rgb)[0] || a - b; });
+      names[g[0]] = '深' + n;
+      names[g[g.length - 1]] = '浅' + n;
+    });
+    var seen = {};
+    return names.map(function (n) {
+      if (!seen[n]) { seen[n] = 1; return n; }
+      seen[n]++;
+      return n + seen[n];
+    });
+  }
+
   var PHASE_NAME = { inc: '增针段', flat: '平段', dec: '减针段' };
 
   function formatRuns(rs, syms) {
@@ -283,7 +406,7 @@
   return {
     YARN: YARN, hexToRgb: hexToRgb, rgbToHex: rgbToHex, rgbToLab: rgbToLab, labDist2: labDist2,
     mulberry32: mulberry32, kmeansPalette: kmeansPalette, mapToYarn: mapToYarn, nearestName: nearestName,
-    assignPixels: assignPixels, sortByCount: sortByCount, symbolFor: symbolFor,
+    assignPixels: assignPixels, dedupePixels: dedupePixels, cleanIsolated: cleanIsolated, colorChanges: colorChanges, cropRect: cropRect, chartSize: chartSize, uniqueNames: uniqueNames, sortByCount: sortByCount, symbolFor: symbolFor,
     tapestryRows: tapestryRows, c2cDiagonals: c2cDiagonals, diagCells: diagCells,
     PHASE_NAME: PHASE_NAME, formatTapestryLine: formatTapestryLine, formatC2CLine: formatC2CLine
   };

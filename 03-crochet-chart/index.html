@@ -4,31 +4,49 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>钩针图纸生成器</title>
+<meta name="description" content="上传一张图片，生成可照着钩的像素格钩针图纸，含颜色图例、换线统计与逐行读针文字。纯本地运行，图片不上传。">
+<meta name="theme-color" content="#f6f1e6">
+<meta property="og:title" content="钩针图纸生成器">
+<meta property="og:description" content="图片转像素格钩针图纸，逐行读针，纯本地运行。">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiNmNmYxZTYiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIyMiIgZmlsbD0iI2I4MzcyYiIvPjxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2Y2ZjFlNiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCI+PHBhdGggZD0iTTEzIDI2cTE5IDEwIDM4IDAiLz48cGF0aCBkPSJNMTIgMzZxMjAgMTIgNDAgMCIvPjxwYXRoIGQ9Ik0yMiAxM3EtNiAxOSA0IDM4Ii8+PHBhdGggZD0iTTM4IDEycTkgMjAgLTIgNDAiLz48L2c+PC9zdmc+Cg==">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="top">
+<header class="top noprint">
   <h1>钩针图纸</h1>
   <p class="sub">上传一张图，生成可以照着钩的像素格图纸</p>
 </header>
 
 <main>
-  <section class="card" id="drop">
+  <section class="card noprint" id="drop">
     <label class="pick" for="file">
       <span class="pick-main">选择图片</span>
       <span class="pick-sub">或把图片拖到这里 · 图片只在本机处理，不会上传</span>
     </label>
     <input type="file" id="file" accept="image/*">
-    <div id="srcinfo" class="muted"></div>
+    <div class="muted" id="resumeHint" hidden></div>
+    <div class="srcrow" id="srcrow" hidden>
+      <img id="thumb" class="thumb" alt="原图缩略图">
+      <div id="srcinfo" class="muted"></div>
+    </div>
   </section>
 
-  <section class="card" id="params">
+  <section class="card noprint" id="params">
     <div class="row">
       <label for="cols">格子宽度（列数）</label>
       <output id="colsOut">40</output>
     </div>
     <input type="range" id="cols" min="10" max="150" value="40">
     <div class="muted" id="sizeInfo">高度按图片比例自动计算</div>
+
+    <div class="row">
+      <label for="crop">裁剪</label>
+      <select id="crop">
+        <option value="orig">保持原比例</option>
+        <option value="square">居中裁成正方形</option>
+      </select>
+    </div>
 
     <div class="row">
       <label for="ncolors">颜色数</label>
@@ -47,38 +65,42 @@
     <div class="checks">
       <label><input type="checkbox" id="yarn"> 使用毛线色卡（约 40 色）</label>
       <label><input type="checkbox" id="dither"> 抖动（过渡更柔和，色块更碎）</label>
+      <label><input type="checkbox" id="clean"> 清理孤立格（单个异色格并入邻色，少换线）</label>
     </div>
     <button id="gen" class="btn primary" disabled>生成图纸</button>
+    <div id="status" class="muted" role="status"></div>
   </section>
 
   <div id="result" hidden>
-    <section class="card">
+    <section class="card" id="chartCard">
       <h2>图纸</h2>
-      <div class="toolbar">
+      <div class="toolbar noprint">
         <label class="chk"><input type="checkbox" id="showSym"> 显示符号</label>
         <button class="btn small" id="zoomOut">缩小</button>
         <button class="btn small" id="zoomFit">适应宽度</button>
         <button class="btn small" id="zoomIn">放大</button>
       </div>
       <div class="chart-wrap" id="chartWrap"><canvas id="chart"></canvas></div>
-      <div class="muted">第 1 行在最下方；粗线每 10 格一条；编号从左、从下数起。</div>
-      <div class="toolbar">
+      <div class="muted noprint">第 1 行在最下方；粗线每 10 格一条；编号从左、从下数起。</div>
+      <div class="toolbar noprint">
         <button class="btn" id="savePng">保存图纸 PNG</button>
         <button class="btn" id="saveTxt">导出逐行文字 .txt</button>
+        <button class="btn" id="printBtn">打印图纸</button>
       </div>
-      <div id="saveHint" class="muted"></div>
+      <div id="saveHint" class="muted noprint"></div>
     </section>
 
-    <section class="card">
+    <section class="card" id="legendCard">
       <h2>颜色图例与估算</h2>
       <div id="est" class="muted"></div>
+      <div id="chg" class="muted changes"></div>
       <ul id="legend" class="legend"></ul>
     </section>
 
-    <section class="card">
+    <section class="card" id="rowsCard">
       <h2 id="readTitle">逐行读针</h2>
       <div id="readNote" class="muted"></div>
-      <div class="stepper">
+      <div class="stepper noprint">
         <button class="btn" id="prev">上一行</button>
         <div id="cur" class="cur"></div>
         <button class="btn primary" id="next">下一行</button>
@@ -93,7 +115,7 @@
   <div class="overlay-body"><img id="ovImg" alt="钩针图纸"></div>
 </div>
 
-<footer>纯本地运行 · 无网络请求 · 色卡为通用自定义色名，非品牌色号</footer>
+<footer class="noprint">纯本地运行 · 无网络请求 · 色卡为通用自定义色名，非品牌色号</footer>
 
 <script src="chart-core.js"></script>
 <script src="app.js"></script>

@@ -55,3 +55,24 @@ select{font:inherit;padding:6px 8px;border:1px solid var(--line);background:#fff
 .overlay-body img{max-width:100%;height:auto;background:#fff;-webkit-touch-callout:default;-webkit-user-select:auto;user-select:auto}
 footer{text-align:center;color:var(--ink2);font-size:12px;padding:10px 16px 28px}
 [hidden]{display:none!important}
+.srcrow{display:flex;gap:10px;align-items:center;margin-top:10px}
+.thumb{width:72px;height:72px;object-fit:cover;border:1px solid var(--line);border-radius:4px;background:#fff;flex:none}
+#status{min-height:1.4em}
+.changes{margin-top:6px;color:var(--ink)}
+@media print{
+  @page{size:A4;margin:10mm}
+  body{background:#fff;color:#000}
+  .noprint,.overlay,footer,#drop,#params,.top,.stepper{display:none!important}
+  main{max-width:none;padding:0}
+  .card{border:0;padding:0;margin:0 0 6mm;background:#fff}
+  h2{border-left:3px solid #000}
+  .chart-wrap{overflow:visible;max-height:none;border:0}
+  #chart{width:100%!important;max-width:100%!important;height:auto;page-break-inside:avoid;break-inside:avoid}
+  .legend{grid-template-columns:repeat(2,1fr)}
+  .legend li{border-color:#000;break-inside:avoid}
+  .sw{border-color:#000;background:#fff!important;color:#000!important}
+  .rows{max-height:none;overflow:visible;border:0;columns:2;column-gap:8mm}
+  .rows li{font-size:11px;border-bottom:1px dotted #888;break-inside:avoid;padding:2px 4px;background:none!important;color:#000!important;font-weight:400!important;border-left:0!important}
+  #rowsCard,#legendCard{break-before:auto}
+  #rowsCard{break-before:page}
+}

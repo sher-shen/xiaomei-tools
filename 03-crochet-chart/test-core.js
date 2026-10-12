@@ -55,4 +55,34 @@ assert(m.some(x => x.name === '炭黑' || x.name === '纯白')); ok(true, '色�
 // sortByCount
 const s = C.sortByCount([1,1,1,0,2,2], [[0,0,0],[1,1,1],[2,2,2]]);
 assert.deepStrictEqual(s.indices, [0,0,0,2,1,1]); ok(true, 'sortByCount A=最多');
+
+// 4) 去重 / 清理孤格 / 换线统计 / 裁剪
+const dd = C.dedupePixels([[1,1,1],[1,1,1],[2,2,2]]);
+assert.strictEqual(dd.colors.length, 2); assert.deepStrictEqual(dd.weights, [2,1]); ok(true, 'dedupePixels 合并相同颜色并计权');
+const many = []; for (let i = 0; i < 5000; i++) many.push([i % 256, (i * 7) % 256, (i * 13) % 256]);
+const dm = C.dedupePixels(many, 500); assert(dm.colors.length <= 500 && dm.weights.reduce((a, b) => a + b, 0) === 5000); ok(true, '独立色过多时量化，权重总和不变');
+const big = []; for (let i = 0; i < 22500; i++) big.push([(i * 37) % 256, (i * 91) % 256, (i * 53) % 256]);
+const t0 = Date.now(); const pb = C.kmeansPalette(big, 8, 1, 15); assert(pb.length === 8 && Date.now() - t0 < 3000); ok(true, '150x150 大图 k-means 在 3 秒内完成');
+// 孤格：中心 1 被四个 0 包围 -> 0；角落 2 的两邻都是 0 -> 0；非孤格不变
+const g = [0,0,0,0, 0,1,0,0, 0,0,0,0, 2,0,1,1];
+const gc = C.cleanIsolated(g, 4, 4);
+assert.strictEqual(gc[5], 0); assert.strictEqual(gc[12], 0); ok(true, '孤立格并入邻色');
+assert.strictEqual(gc[14], 1); assert.strictEqual(gc[15], 1); ok(true, '相邻同色的格保持不变');
+const src = [0,1,2,3]; C.cleanIsolated(src, 2, 2); assert.deepStrictEqual(src, [0,1,2,3]); ok(true, '清理不修改原数组');
+assert.strictEqual(C.cleanIsolated([1,0,0, 0,2,0, 0,0,0], 3, 3)[4], 0); ok(true, '3x3 中心孤格并入 0');
+const cc = C.colorChanges(C.tapestryRows(idx, 4, 4));
+assert.deepStrictEqual(cc.perStep, [1,1,1,1]); assert.strictEqual(cc.within, 4); ok(true, '每行换色次数');
+assert.strictEqual(cc.turns, 1); assert.strictEqual(cc.total, 5); ok(true, '行间衔接换色计入总数 (行内4+衔接1)');
+const cc1 = C.colorChanges(C.tapestryRows(new Array(9).fill(0), 3, 3)); assert.strictEqual(cc1.total, 0); ok(true, '单色图换线 0 次');
+assert.deepStrictEqual(C.cropRect(200, 100, 'square'), { sx: 50, sy: 0, sw: 100, sh: 100 }); ok(true, '居中正方形裁剪');
+assert.deepStrictEqual(C.cropRect(200, 100, 'orig'), { sx: 0, sy: 0, sw: 200, sh: 100 }); ok(true, '保持原比例');
+// 尺寸 / 重名
+let cs = C.chartSize(150, 200, 1000, 300);
+assert.deepStrictEqual([cs.w, cs.h, cs.adjusted], [60, 300, true]); ok(true, '200x1000 选 150 列 -> 60x300 并提示');
+cs = C.chartSize(40, 200, 100, 300); assert.deepStrictEqual([cs.w, cs.h, cs.adjusted], [40, 20, false]); ok(true, '正常比例不调整');
+cs = C.chartSize(150, 1, 1, 300); assert.deepStrictEqual([cs.w, cs.h, cs.adjusted], [150, 150, false]); ok(true, '正方形 150 列不调整');
+const un = C.uniqueNames([{name:'朱红系',rgb:[200,54,42]},{name:'朱红系',rgb:[120,20,10]},{name:'灰系',rgb:[1,1,1]}]);
+assert.deepStrictEqual(un, ['浅朱红系','深朱红系','灰系']); ok(true, '重名按明度加深/浅');
+const un3 = C.uniqueNames([{name:'A',rgb:[50,50,50]},{name:'A',rgb:[100,100,100]},{name:'A',rgb:[200,200,200]},{name:'A',rgb:[150,150,150]}]);
+assert.strictEqual(new Set(un3).size, 4); ok(true, '多重名仍保证唯一: ' + un3);
 console.log('\n全部通过 (' + n + ' 项)');

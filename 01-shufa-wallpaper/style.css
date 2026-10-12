@@ -57,3 +57,13 @@ footer a{color:var(--mute)}
 .overlay img{max-width:100%;max-height:76vh;object-fit:contain;-webkit-touch-callout:default;-webkit-user-select:auto;user-select:auto}
 .overlay .tip{color:#f4efe4;margin:0;letter-spacing:.3em}
 .overlay button{color:#f4efe4;border-color:#f4efe4}
+
+/* 补充：加载提示 / 焦点 / 辅助 */
+.cvbox{position:relative;display:inline-block;max-width:100%}
+.loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(244,239,228,.72);color:var(--ink);letter-spacing:.3em;font-size:15px}
+.loading[hidden]{display:none}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+button:focus-visible,a:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
+button.link{border:none;background:none;color:var(--mute);text-decoration:underline;font-size:13px;padding:10px 8px;margin-top:6px}
+.warn.soft{color:var(--ink);background:#efe9da}

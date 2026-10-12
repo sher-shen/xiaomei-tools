@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>小美的小工具</title>
+<meta name="description" content="小美的小工具集：书法壁纸、年度藏书票、钩针图纸、沙箱能力测试。纯本地运行，无需网络，图片不上传。">
+<meta name="theme-color" content="#f6f1e6">
+<meta property="og:title" content="小美的小工具">
+<meta property="og:description" content="书法壁纸、藏书票、钩针图纸等纯本地小工具，图片不上传。">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiNmNmYxZTYiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIyMiIgZmlsbD0iI2I4MzcyYiIvPjxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2Y2ZjFlNiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCI+PHBhdGggZD0iTTEzIDI2cTE5IDEwIDM4IDAiLz48cGF0aCBkPSJNMTIgMzZxMjAgMTIgNDAgMCIvPjxwYXRoIGQ9Ik0yMiAxM3EtNiAxOSA0IDM4Ii8+PHBhdGggZD0iTTM4IDEycTkgMjAgLTIgNDAiLz48L2c+PC9zdmc+Cg==">
 <style>
 :root{--paper:#f6f1e6;--card:#fbf8f0;--ink:#2a2826;--ink2:#6b655c;--line:#ddd3bf;--red:#b8372b}
 *{box-sizing:border-box}
@@ -13,21 +19,25 @@ h1{margin:0;font-size:28px;letter-spacing:.3em;font-weight:600}
 h1::after{content:"";display:block;width:32px;height:3px;background:var(--red);margin:10px auto 0}
 p.sub{color:var(--ink2);font-size:14px;margin:8px 0 0}
 main{max-width:560px;margin:16px auto 0;display:grid;gap:12px}
-a.card{display:block;text-decoration:none;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:16px 18px;border-left:4px solid var(--red)}
+a.card{display:flex;gap:14px;align-items:center;text-decoration:none;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:16px 18px;border-left:4px solid var(--red)}
 a.card:active{background:#f1e8d6}
 .t{font-size:19px;font-weight:600}
 .d{font-size:13px;color:var(--ink2);margin-top:2px}
+.u{font-size:12px;color:var(--ink2);margin-top:4px;line-height:1.5}
+.th{flex:none;width:64px;height:64px;border:1px solid var(--line);border-radius:4px;background:#fff}
+.tx{min-width:0}
+footer a{color:var(--red)}
 footer{text-align:center;color:var(--ink2);font-size:12px;margin-top:28px}
 </style>
 </head>
 <body>
 <header><h1>小工具集</h1><p class="sub">纯本地运行 · 无需网络 · 图片不上传</p></header>
 <main>
-  <a class="card" href="01-shufa-wallpaper/"><div class="t">书法壁纸</div><div class="d">书法壁纸 · 印章 · 节气</div></a>
-  <a class="card" href="02-bookplate/"><div class="t">藏书票</div><div class="d">年度读书藏书票</div></a>
-  <a class="card" href="03-crochet-chart/"><div class="t">钩针图纸</div><div class="d">图片转像素格图纸，逐行读针</div></a>
-  <a class="card" href="00-sandbox-test/"><div class="t">沙箱能力测试</div><div class="d">检测小红书小工具环境的上传、导出、字体等能力</div></a>
+  <a class="card" href="01-shufa-wallpaper/"><svg class="th" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" fill="#f1e8d6"/><path d="M14 46q10-6 14-20t14 4q6 8 10-10" fill="none" stroke="#2a2826" stroke-width="5" stroke-linecap="round"/><rect x="40" y="38" width="14" height="14" fill="#b8372b"/></svg><div class="tx"><div class="t">书法壁纸</div><div class="d">书法壁纸 · 印章 · 节气</div><div class="u">用本地书法字体写字，生成手机壁纸，可加印章和节气。</div></div></a>
+  <a class="card" href="02-bookplate/"><svg class="th" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" fill="#fbf8f0"/><rect x="12" y="8" width="40" height="48" fill="none" stroke="#2a2826" stroke-width="2"/><rect x="16" y="12" width="32" height="40" fill="none" stroke="#b8372b" stroke-width="1"/><circle cx="32" cy="28" r="9" fill="none" stroke="#2a2826" stroke-width="2"/><path d="M22 46h20M26 50h12" stroke="#2a2826" stroke-width="2"/></svg><div class="tx"><div class="t">藏书票</div><div class="d">年度读书藏书票</div><div class="u">把一年的读书记录排成一张藏书票，可保存成图片。</div></div></a>
+  <a class="card" href="03-crochet-chart/"><svg class="th" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" fill="#fff"/><g><rect x="8" y="8" width="16" height="16" fill="#b8372b"/><rect x="24" y="8" width="16" height="16" fill="#f6e49a"/><rect x="40" y="8" width="16" height="16" fill="#b8372b"/><rect x="8" y="24" width="16" height="16" fill="#f6e49a"/><rect x="24" y="24" width="16" height="16" fill="#2a2826"/><rect x="40" y="24" width="16" height="16" fill="#f6e49a"/><rect x="8" y="40" width="16" height="16" fill="#b8372b"/><rect x="24" y="40" width="16" height="16" fill="#f6e49a"/><rect x="40" y="40" width="16" height="16" fill="#b8372b"/></g><path d="M8 24h48M8 40h48M24 8v48M40 8v48" stroke="#0004"/></svg><div class="tx"><div class="t">钩针图纸</div><div class="d">图片转像素格图纸，逐行读针</div><div class="u">上传图片，转成像素格图纸，含图例、换线统计、逐行读针，可打印。</div></div></a>
+  <a class="card" href="00-sandbox-test/"><svg class="th" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" fill="#fbf8f0"/><g fill="none" stroke="#2a2826" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M14 34l12 12 24-26"/></g><rect x="10" y="10" width="44" height="44" rx="6" fill="none" stroke="#b8372b" stroke-width="2.5"/></svg><div class="tx"><div class="t">沙箱能力测试</div><div class="d">检测小红书小工具环境的上传、导出、字体等能力</div><div class="u">在小红书里打开，看上传、导出、字体、分享等能力是否可用。</div></div></a>
 </main>
-<footer>墨色 · 米白 · 朱红</footer>
+<footer>墨色 · 米白 · 朱红<br><a href="https://github.com/sher-shen/xiaomei-tools" rel="noopener">GitHub 仓库</a></footer>
 </body>
 </html>

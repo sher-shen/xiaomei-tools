@@ -44,7 +44,7 @@ const $ = id => document.getElementById(id);
 const cv = $('cv'), ctx = cv.getContext('2d');
 const el = {
   text: $('text'), sig: $('sig'), keepPunc: $('keepPunc'), scale: $('scale'), scaleVal: $('scaleVal'),
-  sealOn: $('sealOn'), sealText: $('sealText'), sealPrev: $('sealPrev'),
+  sealOn: $('sealOn'), sealText: $('sealText'), noMark: $('noMark'), sealPrev: $('sealPrev'),
   warn: $('warn'), term: $('term'), termHint: $('termHint')
 };
 const radio = name => document.querySelector('input[name="' + name + '"]:checked').value;
@@ -63,21 +63,22 @@ function hashStr(s) { let h = 2166136261; for (const c of s) { h ^= c.codePointA
 const inCharset = ch => window.CHARSET.has(ch);
 
 /* ---------- 字体加载 ---------- */
-const fontReady = {};
+const fontReady = {}, famLoaded = {};
 function loadFont(fam, sample) {
   const key = fam + '|' + sample;
   if (!fontReady[key]) {
     fontReady[key] = document.fonts.load('64px "' + fam + '"', sample || '书')
-      .catch(function () { /* 加载失败则回退系统字体 */ });
+      .catch(function () { /* 加载失败则回退系统字体 */ })
+      .then(function () { famLoaded[fam] = true; });
   }
   return fontReady[key];
 }
 
 /* ---------- 宣纸纹理（程序化，按尺寸+类型缓存） ---------- */
-const bgCache = {};
+const bgCache = {}, bgOrder = [];
 function makePaper(w, h, type) {
   const key = w + 'x' + h + type;
-  if (bgCache[key]) return bgCache[key];
+  if (bgCache[key]) { bgOrder.splice(bgOrder.indexOf(key), 1); bgOrder.push(key); return bgCache[key]; }
   const cfg = BGS[type], rnd = mulberry32(hashStr(key));
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const g = c.getContext('2d');
@@ -115,7 +116,8 @@ function makePaper(w, h, type) {
   const vg = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.75);
   vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, cfg.dark ? 'rgba(0,0,0,0.35)' : 'rgba(90,70,40,0.16)');
   g.fillStyle = vg; g.fillRect(0, 0, w, h);
-  bgCache[key] = c;
+  bgCache[key] = c; bgOrder.push(key);
+  while (bgOrder.length > 2) delete bgCache[bgOrder.shift()]; // 最多缓存 2 张（LRU）
   return c;
 }
 
@@ -184,7 +186,7 @@ function sealCells(n, b, col, rnd) {
   if (n === 3) { c.length = 0; c.push({ x: b.x + hw, y: b.y, w: hw, h: b.h }, { x: b.x, y: b.y, w: hw, h: b.h / 2 }, { x: b.x, y: b.y + b.h / 2, w: hw, h: b.h / 2 }); }
   return c;
 }
-// 把单字按实际字形包围盒缩放填满格子（宽高比最多拉伸 ±15%）
+// 把单字按实际字形包围盒缩放填满格子；字形宽高比偏离格子超过 2 倍（如 一、日）则等比缩放居中，不拉伸
 function drawGlyph(g, ch, cell) {
   g.save(); g.translate(cell.x + cell.w / 2, cell.y + cell.h / 2);
   if (!inCharset(ch)) { g.globalAlpha = 0.5; g.fillRect(-cell.w * 0.3, -cell.h * 0.3, cell.w * 0.6, cell.h * 0.6); g.restore(); return; }
@@ -193,7 +195,9 @@ function drawGlyph(g, ch, cell) {
   const bw = L + R, bh = A + D;
   if (bw > 0 && bh > 0) {
     const tw = cell.w * 0.92, th = cell.h * 0.92, u = Math.min(tw / bw, th / bh);
-    g.scale(Math.min(tw / bw, u * 1.15), Math.min(th / bh, u * 1.15));
+    const ratio = (bw / bh) / (tw / th);
+    if (ratio > 2 || ratio < 0.5) g.scale(u, u);
+    else g.scale(Math.min(tw / bw, u * 1.15), Math.min(th / bh, u * 1.15));
     g.fillText(ch, -(R - L) / 2, -(D - A) / 2);
   }
   g.restore();
@@ -257,7 +261,7 @@ function makeSeal(size) {
 function splitLines(raw, keep) {
   let lines;
   if (raw.indexOf('\n') >= 0) lines = raw.split('\n');
-  else lines = raw.split(/(?<=[，。、；：！？,.;:!?])/); // 单行长句按标点自动分列
+  else lines = raw.replace(/([，。、；：！？,.;:!?])/g, '$1\n').split('\n'); // 单行长句按标点自动分列
   const out = [];
   lines.forEach(function (ln) {
     let chars = Array.from(ln.replace(/[ \t　]/g, ''));
@@ -293,11 +297,19 @@ async function render() {
     el.warn.hidden = false;
     el.warn.textContent = miss.map(c => '「' + c + '」不在字库中，建议换字').join('；');
   } else el.warn.hidden = true;
+  const total = lines.reduce((a, l) => a + l.length, 0);
+  if (total > 80) {
+    el.warn.hidden = false; el.warn.classList.add('soft');
+    el.warn.textContent = (miss.length ? el.warn.textContent + '。' : '') + '字数较多，建议分两张';
+  } else el.warn.classList.remove('soft');
 
   // 等字体就绪后再画
   const sample = lines.concat([sig]).map(a => a.join('')).join('') + '书';
+  const needWait = !famLoaded[fam] || !famLoaded.MaShanZheng;
+  if (needWait) $('fontLoading').hidden = false;
   await Promise.all([loadFont(fam, sample), loadFont('MaShanZheng', seal.join(''))]);
   if (token !== renderToken) return;
+  $('fontLoading').hidden = true;
 
   if (cv.width !== W) cv.width = W;
   if (cv.height !== H) cv.height = H;
@@ -309,22 +321,37 @@ async function render() {
   if (lines.length) (vertical ? layoutVertical : layoutHorizontal)(L);
   else { ctx.fillStyle = 'rgba(128,120,110,.6)'; ctx.font = (W * 0.04) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('请输入文字', W / 2, H / 2); }
 
+  watermark(ctx, W, H, bg.ink);
+
   // 同步小印章预览
   const sp = el.sealPrev, sc = makeSeal(sp.width);
   sp.getContext('2d').clearRect(0, 0, sp.width, sp.height); sp.getContext('2d').drawImage(sc, 0, 0);
 }
 
 // 画单个字：缺字 → 灰色占位
-function drawChar(g, ch, x, y, fs, ink, vertical) {
+const VQUOTE = { '“': '「', '”': '」', '‘': '『', '’': '』' };
+function drawChar(g, ch, x, y, fs, ink, vertical, pitch) {
+  if (vertical && VQUOTE[ch]) ch = VQUOTE[ch];
   if (!inCharset(ch)) {
     g.save(); g.fillStyle = 'rgba(140,135,128,0.35)';
     roundRect(g, x - fs * 0.36, y - fs * 0.36, fs * 0.72, fs * 0.72, fs * 0.08); g.fill(); g.restore();
     return;
   }
   g.fillStyle = ink;
-  if (vertical && /[，。、；：！？,.;:!?]/.test(ch)) { // 竖排标点：缩小并移到格子右上
-    g.save(); g.font = (fs * 0.55) + 'px "' + g.fontFam + '"';
-    g.fillText(ch, x + fs * 0.28, y - fs * 0.3); g.restore(); return;
+  if (vertical && ch === '—') { // 竖排破折号：连续竖线（每个占满一格，相邻自动相接）
+    const h = pitch || fs * 1.08;
+    g.save(); g.strokeStyle = ink; g.lineWidth = Math.max(1, fs * 0.05); g.lineCap = 'butt';
+    g.beginPath(); g.moveTo(x, y - h / 2); g.lineTo(x, y + h / 2); g.stroke(); g.restore(); return;
+  }
+  if (vertical && /[，。、；：！？,.;:!?]/.test(ch)) { // 竖排标点：缩小，按字形实际墨迹中心放到格子右上
+    g.save(); g.font = (fs * 0.55) + 'px "' + g.fontFam + '"'; g.textBaseline = 'alphabetic'; g.textAlign = 'center';
+    const m = g.measureText(ch);
+    const cx = (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2, cy = (m.actualBoundingBoxDescent - m.actualBoundingBoxAscent) / 2;
+    g.fillText(ch, x + fs * 0.3 - cx, y - fs * 0.28 - cy); g.restore(); return;
+  }
+  if (vertical && /[《》〈〉（）()「」『』“”‘’—…]/.test(ch)) { // 竖排括号/引号/破折号：顺时针转 90°
+    g.save(); g.translate(x, y); g.rotate(Math.PI / 2); g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(ch, 0, 0); g.restore(); return;
   }
   g.fillText(ch, x, y);
 }
@@ -347,7 +374,7 @@ function layoutVertical(L) {
   L.lines.forEach(function (ln, ci) {
     const cx = x0 - (ci + 0.5) * colW;
     // 每列自上而下；较短的列顶端对齐
-    ln.forEach(function (ch, ri) { drawChar(g, ch, cx, top + (ri + 0.5) * pitch, fs, L.bg.ink, true); });
+    ln.forEach(function (ch, ri) { drawChar(g, ch, cx, top + (ri + 0.5) * pitch, fs, L.bg.ink, true, pitch); });
   });
   g.restore();
   // 落款 + 印章：位于最左侧列，底部对齐正文底部
@@ -357,12 +384,12 @@ function layoutVertical(L) {
     const ss = L.sealCv ? Math.min(fs * 0.72, extraCols * fs * 0.95) : 0;
     const gap = ss ? fs * 0.12 : 0;
     let sfs = fs * 0.4;
-    const maxSigH = blockH * 0.7 - ss - gap;
-    if (L.sig.length && L.sig.length * sfs * 1.12 > maxSigH) sfs = Math.max(maxSigH / (L.sig.length * 1.12), fs * 0.15);
+    const maxSigH = Math.max(bottom - ss - gap - my, 8); // 落款顶端不越过上边距
+    if (L.sig.length && L.sig.length * sfs * 1.12 > maxSigH) sfs = maxSigH / (L.sig.length * 1.12);
     const sigH = L.sig.length * sfs * 1.12;
     const sigTop = bottom - ss - gap - sigH;
     g.font = sfs + 'px "' + L.fam + '"'; g.fontFam = L.fam;
-    L.sig.forEach(function (ch, i) { drawChar(g, ch, sx, sigTop + (i + 0.5) * sfs * 1.12, sfs, L.bg.ink, true); });
+    L.sig.forEach(function (ch, i) { drawChar(g, ch, sx, sigTop + (i + 0.5) * sfs * 1.12, sfs, L.bg.ink, true, sfs * 1.12); });
     if (L.sealCv) stampSeal(g, L.sealCv, sx - ss / 2, bottom - ss, ss, L.bg.dark);
   }
 }
@@ -387,14 +414,27 @@ function layoutHorizontal(L) {
   });
   g.restore();
   if (hasExtra) {
-    const right = (W + maxW) / 2;
-    const sfs = fs * 0.42, ss = L.sealCv ? fs * 0.8 : 0;
+    let right = (W + maxW) / 2;
+    let sfs = fs * 0.42;
+    const ss = L.sealCv ? fs * 0.8 : 0;
+    const avail = W - 2 * mx;
+    if (L.sig.length && L.sig.length * sfs * 1.12 > avail) sfs = avail / (L.sig.length * 1.12); // 落款宽不超过 W-2*边距
     const sy = top + blockH + sfs * 0.7;
     g.font = sfs + 'px "' + L.fam + '"'; g.fontFam = L.fam;
     const sw = L.sig.length * sfs * 1.12;
+    right = Math.min(Math.max(right, mx + sw, mx + ss), W - mx);
     L.sig.forEach(function (ch, i) { drawChar(g, ch, right - sw + (i + 0.5) * sfs * 1.12, sy, sfs, L.bg.ink, false); });
     if (L.sealCv) stampSeal(g, L.sealCv, right - ss, sy + sfs * 0.7, ss, L.bg.dark);
   }
+}
+
+function watermark(g, W, H, ink) {
+  if (el.noMark.checked) return;
+  g.save(); g.globalAlpha = 0.25; g.fillStyle = ink; g.shadowBlur = 0;
+  g.font = Math.round(W * 0.015) + 'px "PingFang SC","Helvetica Neue",sans-serif';
+  g.textAlign = 'right'; g.textBaseline = 'alphabetic';
+  g.fillText('xiaomei-tools · 书法壁纸', W - W * 0.05, H - H * 0.025);
+  g.restore();
 }
 
 function stampSeal(g, sealCv, x, y, size, dark) {
@@ -406,46 +446,81 @@ function stampSeal(g, sealCv, x, y, size, dark) {
 }
 
 /* ---------- 保存 / 导出 ---------- */
-function showBlob(canvas, name) {
-  canvas.toBlob(function (blob) {
-    if (!blob) { alert('生成失败，请重试'); return; }
-    const url = URL.createObjectURL(blob);
-    // 1) 触发下载（桌面浏览器）
-    try { const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); } catch (e) { /* 忽略 */ }
-    // 2) 全屏层显示 <img>，供 iOS / App 内置浏览器长按保存
-    $('outImg').src = url; $('overlay').hidden = false;
-  }, 'image/png');
+function closeOverlay() { $('overlay').hidden = true; $('outImg').removeAttribute('src'); }
+async function flushRender() {
+  if (timerActive || pending) { clearTimeout(timer); timerActive = false; await render(); }
 }
-$('btnSave').addEventListener('click', async function () {
-  await render();
-  showBlob(cv, 'shufa-wallpaper.png');
+// 统一保存：手机（粗指针）优先系统分享，8 秒无响应/出错 → 下载 + 长按保存层
+async function saveCanvas(canvas, filename, btn) {
+  const all = [$('btnSave'), $('btnSeal'), $('btnCard')];
+  if (all.some(b => b.disabled)) return;
+  const label = btn.textContent;
+  all.forEach(b => b.disabled = true); btn.textContent = '正在生成…';
+  let tid = 0, url = '';
+  try {
+    await flushRender();
+    if (typeof canvas === 'function') canvas = await canvas();
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+    if (!blob) { alert('生成失败，请重试'); return; }
+    const file = new File([blob], filename, { type: 'image/png' });
+    const coarse = window.matchMedia && matchMedia('(pointer:coarse)').matches;
+    if (coarse && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await Promise.race([
+          navigator.share({ files: [file] }),
+          new Promise(function (_, rej) { tid = setTimeout(function () { rej(new Error('share-timeout')); }, 8000); })
+        ]);
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return; // 用户取消
+        /* 超时或其它错误：回退 */
+      }
+    }
+    try {
+      url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+      const u = url; setTimeout(function () { URL.revokeObjectURL(u); }, 10000); url = '';
+    } catch (e) { /* 忽略 */ }
+    $('outImg').src = canvas.toDataURL('image/png'); $('overlay').hidden = false;
+  } catch (e) {
+    alert('生成失败，请重试');
+  } finally {
+    clearTimeout(tid);
+    if (url) URL.revokeObjectURL(url);
+    btn.textContent = label; all.forEach(b => b.disabled = false);
+  }
+}
+$('btnSave').addEventListener('click', function () { saveCanvas(cv, 'shufa-wallpaper.png', this); });
+$('btnSeal').addEventListener('click', function () {
+  saveCanvas(async function () {
+    await loadFont('MaShanZheng', sealChars().join(''));
+    return makeSeal(600);
+  }, 'seal.png', this);
 });
-$('btnSeal').addEventListener('click', async function () {
-  await loadFont('MaShanZheng', sealChars().join(''));
-  showBlob(makeSeal(600), 'seal.png');
+$('btnCard').addEventListener('click', function () {
+  saveCanvas(async function () {
+    const W = 1242, H = 1656, chars = sealChars(), fam = radio('font');
+    await Promise.all([loadFont('MaShanZheng', chars.join('') + '书'), loadFont(fam, chars.join(''))]);
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    g.drawImage(makePaper(W, H, 'xuan'), 0, 0);
+    const ss = Math.round(W * 0.6);
+    g.save(); g.globalCompositeOperation = 'multiply'; g.globalAlpha = 0.94;
+    g.drawImage(makeSeal(ss), (W - ss) / 2, H * 0.1, ss, ss); g.restore();
+    // 印文名称：横排，字距拉开，用当前书法字体
+    const fs = W * 0.055, gap = fs * 1.5, x0 = W / 2 - (chars.length - 1) * gap / 2, y = H * 0.66;
+    g.font = fs + 'px "' + fam + '"'; g.fontFam = fam; g.textAlign = 'center'; g.textBaseline = 'middle';
+    chars.forEach((ch, i) => drawChar(g, ch, x0 + i * gap, y, fs, '#2a2623', false));
+    g.fillStyle = 'rgba(42,38,35,.35)'; g.fillRect(W / 2 - W * 0.04, H * 0.72, W * 0.08, 2);
+    const sig = el.sig.value.trim();
+    g.font = (W * 0.03) + 'px "PingFang SC","Songti SC",serif'; g.fillStyle = '#8a8277'; g.textBaseline = 'middle';
+    g.fillText('字体排印' + (sig ? ' · ' + sig + '制' : ''), W / 2, H * 0.76);
+    watermark(g, W, H, '#2a2623');
+    return c;
+  }, 'seal-card.png', this);
 });
-
-$('btnCard').addEventListener('click', async function () {
-  const W = 1242, H = 1656, chars = sealChars();
-  await loadFont('MaShanZheng', chars.join('') + '书');
-  const c = document.createElement('canvas'); c.width = W; c.height = H;
-  const g = c.getContext('2d');
-  g.drawImage(makePaper(W, H, 'xuan'), 0, 0);
-  const ss = Math.round(W * 0.6);
-  g.save(); g.globalCompositeOperation = 'multiply'; g.globalAlpha = 0.94;
-  g.drawImage(makeSeal(ss), (W - ss) / 2, H * 0.1, ss, ss); g.restore();
-  // 印文名称：横排，字距拉开
-  const fs = W * 0.055, gap = fs * 1.5, x0 = W / 2 - (chars.length - 1) * gap / 2, y = H * 0.66;
-  g.font = fs + 'px "MaShanZheng"'; g.fontFam = 'MaShanZheng'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  chars.forEach((ch, i) => drawChar(g, ch, x0 + i * gap, y, fs, '#2a2623', false));
-  g.fillStyle = 'rgba(42,38,35,.35)'; g.fillRect(W / 2 - W * 0.04, H * 0.72, W * 0.08, 2);
-  const sig = el.sig.value.trim();
-  g.font = (W * 0.03) + 'px "PingFang SC","Songti SC",serif'; g.fillStyle = '#8a8277';
-  g.fillText('字体排印' + (sig ? ' · ' + sig + '制' : ''), W / 2, H * 0.76);
-  showBlob(c, 'seal-card.png');
-});
-$('btnClose').addEventListener('click', function () { $('overlay').hidden = true; });
-$('overlay').addEventListener('click', function (e) { if (e.target === this) this.hidden = true; });
+$('btnClose').addEventListener('click', closeOverlay);
+$('overlay').addEventListener('click', function (e) { if (e.target === this) closeOverlay(); });
 
 /* ---------- 节气 ---------- */
 function recommendTerm(now) {
@@ -463,7 +538,8 @@ function fillTerm() {
   const e = TERMS[el.term.value];
   el.text.value = e[3].replace('，', '，\n');
   el.sig.value = e[0];
-  el.sealText.value = '';
+  el.sealText.value = ''; syncPreset();
+  saveState();
   render();
 }
 function initTerms() {
@@ -478,20 +554,69 @@ function initTerms() {
     const e = TERMS[el.term.value]; el.termHint.textContent = '「' + e[3] + '」 —— ' + e[4];
   });
   $('btnTerm').addEventListener('click', fillTerm);
+  $('btnReset').addEventListener('click', resetAll);
   SEAL_WORDS.forEach(function (w) { const o = document.createElement('option'); o.value = w; o.textContent = w; $('sealPreset').appendChild(o); });
   $('sealPreset').addEventListener('change', function () { if (this.value) el.sealText.value = this.value; });
-  fillTerm();
+  if (loadState()) { syncLabels(); syncPreset(); render(); } else fillTerm();
+}
+
+/* ---------- 记住输入 ---------- */
+const LS_KEY = 'shufa-wallpaper.v1';
+const RADIOS = ['font', 'size', 'layout', 'bg', 'seal', 'sealColor'];
+function syncPreset() {
+  const v = el.sealText.value, p = $('sealPreset');
+  p.value = SEAL_WORDS.indexOf(v) >= 0 ? v : '';
+}
+function syncLabels() {
+  el.scaleVal.textContent = el.scale.value + '%'; $('agingVal').textContent = $('aging').value;
+}
+function saveState() {
+  try {
+    const st = { text: el.text.value, sig: el.sig.value, keepPunc: el.keepPunc.checked, scale: el.scale.value,
+      sealOn: el.sealOn.checked, sealText: el.sealText.value, sealShape: $('sealShape').value, aging: $('aging').value, noMark: el.noMark.checked };
+    RADIOS.forEach(n => st[n] = radio(n));
+    localStorage.setItem(LS_KEY, JSON.stringify(st));
+  } catch (e) { /* 隐私模式等：忽略 */ }
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(LS_KEY); if (!raw) return false;
+    const st = JSON.parse(raw);
+    if (typeof st.text !== 'string') return false;
+    el.text.value = st.text; el.sig.value = st.sig || ''; el.keepPunc.checked = !!st.keepPunc;
+    if (st.scale) el.scale.value = st.scale;
+    el.sealOn.checked = st.sealOn !== false; el.sealText.value = st.sealText || '';
+    if (st.sealShape) $('sealShape').value = st.sealShape;
+    if (st.aging) $('aging').value = st.aging;
+    el.noMark.checked = !!st.noMark;
+    RADIOS.forEach(function (n) {
+      const r = st[n] && document.querySelector('input[name="' + n + '"][value="' + st[n] + '"]');
+      if (r) r.checked = true;
+    });
+    return true;
+  } catch (e) { return false; }
+}
+function resetAll() {
+  try { localStorage.removeItem(LS_KEY); } catch (e) { /* 忽略 */ }
+  const defs = { font: 'MaShanZheng', size: '1170x2532', layout: 'v', bg: 'xuan', seal: 'zhu', sealColor: 'cinnabar' };
+  RADIOS.forEach(n => document.querySelector('input[name="' + n + '"][value="' + defs[n] + '"]').checked = true);
+  el.scale.value = 100; $('aging').value = 45; el.keepPunc.checked = false; el.noMark.checked = false; el.sealOn.checked = true;
+  $('sealShape').value = 'square'; $('sealPreset').value = ''; el.sealText.value = '';
+  syncLabels(); fillTerm();
 }
 
 /* ---------- 事件 ---------- */
-let pending = false;
+let pending = false, timer = 0, timerActive = false;
 function schedule() { if (pending) return; pending = true; requestAnimationFrame(function () { pending = false; render(); }); }
+function debounced() { clearTimeout(timer); timerActive = true; timer = setTimeout(function () { timerActive = false; schedule(); }, 150); }
 ['input', 'change'].forEach(function (ev) {
   document.querySelector('main').addEventListener(ev, function (e) {
     if (e.target === el.term) return;
-    if (e.target === el.scale) el.scaleVal.textContent = el.scale.value + '%';
-    if (e.target.id === "aging") $("agingVal").textContent = e.target.value;
-    schedule();
+    if (e.target === el.sealText) syncPreset();
+    syncLabels(); saveState();
+    // 文字/滑块输入时防抖；单选、下拉、勾选立即重绘
+    if (ev === 'input' && (e.target.tagName === 'TEXTAREA' || e.target.type === 'text' || e.target.type === 'range')) debounced();
+    else { clearTimeout(timer); timerActive = false; schedule(); }
   });
 });
 

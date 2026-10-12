@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>小红书小工具能力测试</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiNmNmYxZTYiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIyMiIgZmlsbD0iI2I4MzcyYiIvPjxnIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2Y2ZjFlNiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCI+PHBhdGggZD0iTTEzIDI2cTE5IDEwIDM4IDAiLz48cGF0aCBkPSJNMTIgMzZxMjAgMTIgNDAgMCIvPjxwYXRoIGQ9Ik0yMiAxM3EtNiAxOSA0IDM4Ii8+PHBhdGggZD0iTTM4IDEycTkgMjAgLTIgNDAiLz48L2c+PC9zdmc+Cg==">
 <style>
 @font-face{font-family:"XMTest";src:url("fonts/test.woff2") format("woff2");font-display:block}
 :root{--paper:#f6f1e6;--card:#fbf8f0;--ink:#2a2826;--ink2:#6b655c;--line:#ddd3bf;--red:#b8372b}
@@ -42,7 +43,13 @@ img.th{max-width:140px;max-height:140px;border:1px solid var(--line);display:blo
   <div id="fontdemo">书法测试</div>
   <div id="r3"></div></div>
 
-<div class="card" id="t4"><h2>4 存储与环境</h2><div id="r4"></div></div>
+<div class="card" id="t4"><h2>4 存储与环境</h2>
+  <button class="btn" id="bclip">测试剪贴板（会覆盖当前剪贴板）</button>
+  <div id="r4"></div></div>
+
+<div class="card" id="t6"><h2>6 实测分享图片</h2>
+  <button class="btn" id="bshare">实测分享图片</button>
+  <div id="r6"></div></div>
 
 <div class="card"><h2>5 报告</h2>
   <button class="btn primary" id="copy">复制报告</button>
@@ -155,20 +162,50 @@ img.th{max-width:140px;max-height:140px;border:1px solid var(--line);display:blo
       }
     } catch (e) { add('r4', false, 'IndexedDB 异常 ' + err(e)); }
     add('r4', typeof navigator.share === 'function', 'navigator.share ' + (typeof navigator.share === 'function' ? '存在' : '不存在'));
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText('xm-test').then(function () { add('r4', true, '剪贴板写入成功'); },
-        function (e) { add('r4', false, '剪贴板写入被拒 ' + err(e)); });
-    } else { add('r4', false, 'navigator.clipboard.writeText 不存在'); }
+    try {
+      var tf = new File([new Blob(['x'], { type: 'image/png' })], 'test.png', { type: 'image/png' });
+      if (typeof navigator.canShare !== 'function') add('r4', false, 'navigator.share 文件分享能力：navigator.canShare 不存在');
+      else add('r4', navigator.canShare({ files: [tf] }), 'navigator.share 文件分享能力（canShare files）' + (navigator.canShare({ files: [tf] }) ? '支持' : '不支持'));
+    } catch (e) { add('r4', false, 'navigator.share 文件分享能力检测异常 ' + err(e)); }
     add('r4', true, 'userAgent: ' + navigator.userAgent);
     add('r4', true, '屏幕 ' + screen.width + '×' + screen.height + '，窗口 ' + innerWidth + '×' + innerHeight + '，devicePixelRatio ' + devicePixelRatio);
     add('r4', true, '协议/地址: ' + location.protocol + '//' + (location.host || '(空)'));
   }
 
+  // 剪贴板：仅点按钮才测
+  $('bclip').addEventListener('click', function () {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText('xm-test').then(function () { add('r4', true, '剪贴板写入成功'); },
+        function (e) { add('r4', false, '剪贴板写入被拒 ' + err(e)); });
+    } else { add('r4', false, 'navigator.clipboard.writeText 不存在'); }
+  });
+
+  // 6 实测分享图片
+  $('bshare').addEventListener('click', function () {
+    var btn = $('bshare');
+    reset('r6');
+    if (typeof navigator.share !== 'function') { add('r6', false, 'navigator.share 不存在'); return; }
+    btn.disabled = true;
+    makeCanvas().toBlob(function (b) {
+      var file, t0 = Date.now(), tm, done = false;
+      function end(ok, text) {
+        if (done) return; done = true; clearTimeout(tm); btn.disabled = false;
+        add('r6', ok, text + '（耗时 ' + (Date.now() - t0) + 'ms）');
+      }
+      try { file = new File([b], 'share-test.png', { type: 'image/png' }); } catch (e) { end(false, '构造 File 失败 ' + err(e)); return; }
+      tm = setTimeout(function () { end(false, '8 秒未返回（超时）'); }, 8000);
+      try {
+        navigator.share({ files: [file], title: '分享测试' }).then(function () { end(true, '分享成功'); },
+          function (e) { if (e && e.name === 'AbortError') end(true, '用户取消（AbortError）'); else end(false, '分享报错 ' + err(e)); });
+      } catch (e) { end(false, '分享同步抛异常 ' + err(e)); }
+    }, 'image/png');
+  });
+
   // 5 报告
-  var names = { r1: '1 照片上传', r2: '2 Canvas 导出', r3: '3 本地字体', r4: '4 存储与环境' };
+  var names = { r1: '1 照片上传', r2: '2 Canvas 导出', r3: '3 本地字体', r4: '4 存储与环境', r6: '6 实测分享图片' };
   function report() {
     var L = ['小红书小工具能力测试报告  ' + new Date().toLocaleString()];
-    ['r1', 'r2', 'r3', 'r4'].forEach(function (k) {
+    ['r1', 'r2', 'r3', 'r4', 'r6'].forEach(function (k) {
       L.push('', '【' + names[k] + '】');
       if (!(R[k] && R[k].length)) L.push('（尚无结果）');
       (R[k] || []).forEach(function (x) { L.push((x.ok ? '✅ ' : '❌ ') + x.text); });

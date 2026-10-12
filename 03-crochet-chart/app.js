@@ -12,16 +12,22 @@
   var timer = null;
 
   // ---------- 输入 ----------
+  var thumbUrl = null;
   function loadFile(f) {
     if (!f || !/^image\//.test(f.type || 'image/')) return;
+    $('resumeHint').hidden = true;
     var url = URL.createObjectURL(f);
+    // 立刻显示缩略图
+    if (thumbUrl) { try { URL.revokeObjectURL(thumbUrl); } catch (e) { /* 忽略 */ } }
+    thumbUrl = url;
+    $('thumb').src = url; $('srcrow').hidden = false;
+    $('srcinfo').textContent = (f.name || '图片') + '  读取中…';
     var img = new Image();
     img.onload = function () {
       srcImg = img; srcName = f.name || '图片';
       $('srcinfo').textContent = srcName + '  ' + img.naturalWidth + '×' + img.naturalHeight;
       $('gen').disabled = false;
       generate();
-      URL.revokeObjectURL(url);
     };
     img.onerror = function () { $('srcinfo').textContent = '这张图片无法读取，请换一张'; };
     img.src = url;
@@ -39,39 +45,79 @@
     loadFile(f);
   });
 
+  // ---------- 记住参数 ----------
+  var P_KEY = 'xm_crochet_params_v1';
+  var P_IDS = ['cols', 'ncolors', 'tech', 'crop'], P_CHK = ['yarn', 'dither', 'clean'];
+  function saveParams() {
+    try {
+      var o = {};
+      P_IDS.forEach(function (id) { o[id] = $(id).value; });
+      P_CHK.forEach(function (id) { o[id] = $(id).checked; });
+      localStorage.setItem(P_KEY, JSON.stringify(o));
+    } catch (e) { /* 忽略 */ }
+  }
+  function loadParams() {
+    try {
+      var o = JSON.parse(localStorage.getItem(P_KEY) || 'null');
+      if (!o) return;
+      P_IDS.forEach(function (id) {
+        if (o[id] == null) return;
+        var el = $(id), old = el.value;
+        el.value = o[id];
+        if (el.value === '' || (el.tagName === 'SELECT' && el.selectedIndex < 0)) el.value = old;
+      });
+      P_CHK.forEach(function (id) { if (typeof o[id] === 'boolean') $(id).checked = o[id]; });
+    } catch (e) { /* 忽略 */ }
+  }
+
   function updateLabels() {
     $('colsOut').textContent = $('cols').value;
     $('ncolorsOut').textContent = $('ncolors').value;
     if (srcImg) {
-      var w = +$('cols').value, h = calcRows(w);
-      $('sizeInfo').textContent = '图纸大小 ' + w + ' × ' + h + ' 格';
+      var z = calcSize();
+      $('sizeInfo').textContent = '图纸大小 ' + z.w + ' × ' + z.h + ' 格' +
+        (z.adjusted ? '（已按比例把列数调整为 ' + z.w + '）' : '');
     }
   }
-  function calcRows(w) {
-    return Math.max(1, Math.min(300, Math.round(w * srcImg.naturalHeight / srcImg.naturalWidth)));
+  function calcSize() {
+    var r = C.cropRect(srcImg.naturalWidth, srcImg.naturalHeight, $('crop').value);
+    return C.chartSize(+$('cols').value, r.sw, r.sh, 300);
   }
   function schedule() {
-    updateLabels();
+    updateLabels(); saveParams();
     if (!srcImg) return;
     clearTimeout(timer);
-    timer = setTimeout(generate, 250);
+    timer = setTimeout(function () { timer = null; generate(); }, 300);   // 防抖 300ms
   }
   ['cols', 'ncolors'].forEach(function (id) { $(id).addEventListener('input', schedule); });
-  ['yarn', 'dither'].forEach(function (id) { $(id).addEventListener('change', schedule); });
-  $('tech').addEventListener('change', function () { if (srcImg) generate(true); });
-  $('gen').addEventListener('click', function () { generate(); });
+  ['yarn', 'dither', 'clean', 'crop'].forEach(function (id) { $(id).addEventListener('change', schedule); });
+  $('tech').addEventListener('change', function () { saveParams(); if (srcImg) generate(); });
+  $('gen').addEventListener('click', function () { clearTimeout(timer); timer = null; generate(); });
 
   // ---------- 生成 ----------
-  function generate(keepPalette) {
+  var genToken = 0, genPending = false;
+  function generate() {
     if (!srcImg) return;
     updateLabels();
-    var w = +$('cols').value, h = calcRows(w), k = +$('ncolors').value;
+    var tok = ++genToken;
+    genPending = true;
+    $('status').textContent = '正在生成…';
+    setTimeout(function () {     // 让出一帧，先把“正在生成”画出来
+      if (tok !== genToken) return;
+      genPending = false;
+      try { doGenerate(); $('status').textContent = ''; }
+      catch (e) { $('status').textContent = '生成失败：' + (e && e.message || e); }
+    }, 30);
+  }
+  function doGenerate() {
+    var z = calcSize(), w = z.w, h = z.h, k = +$('ncolors').value;
     var cv = document.createElement('canvas');
     cv.width = w; cv.height = h;
     var cx = cv.getContext('2d');
     cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h);
     cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high';
-    cx.drawImage(srcImg, 0, 0, w, h);
+    var cr = C.cropRect(srcImg.naturalWidth, srcImg.naturalHeight, $('crop').value);
+    cx.drawImage(srcImg, cr.sx, cr.sy, cr.sw, cr.sh, 0, 0, w, h);
     var data = cx.getImageData(0, 0, w, h).data, px = [];
     for (var i = 0; i < w * h; i++) px.push([data[i * 4], data[i * 4 + 1], data[i * 4 + 2]]);
 
@@ -83,11 +129,17 @@
       pal = rgbPal.map(function (c) { return { rgb: c, hex: C.rgbToHex(c), name: C.nearestName(c) + '系' }; });
     }
     var idx = C.assignPixels(px, w, h, pal.map(function (p) { return p.rgb; }), $('dither').checked);
+    if ($('clean').checked) idx = C.cleanIsolated(idx, w, h);
     var sorted = C.sortByCount(idx, pal);
     var palette = sorted.palette;
+    if (!$('yarn').checked) {
+      var nn = C.uniqueNames(palette);
+      palette.forEach(function (p, i) { p.name = nn[i]; });
+    }
     var tech = $('tech').value;
     var steps = tech === 'c2c' ? C.c2cDiagonals(sorted.indices, w, h) : C.tapestryRows(sorted.indices, w, h);
-    S = { w: w, h: h, indices: sorted.indices, palette: palette, counts: sorted.counts, tech: tech, steps: steps, sig: sig(sorted.indices, w, h, tech) };
+    var chg = C.colorChanges(steps);
+    S = { chg: chg, w: w, h: h, indices: sorted.indices, palette: palette, counts: sorted.counts, tech: tech, steps: steps, sig: sig(sorted.indices, w, h, tech) };
     restoreProgress();
     render();
   }
@@ -133,6 +185,9 @@
       ul.appendChild(li);
     });
     $('est').textContent = '总格数 ' + total + '（' + S.w + ' × ' + S.h + '），共 ' + S.palette.length + ' 种颜色。每种颜色用线量请按自己的针法与线材另行估算。';
+    var u = S.tech === 'c2c' ? '条' : '行', g = S.chg, n = S.steps.length;
+    $('chg').textContent = '换线统计：全图共换线 ' + g.total + ' 次（' + u + '内 ' + g.within + ' 次 + ' + u + '间衔接 ' + g.turns +
+      ' 次）；平均每' + u + ' ' + (g.total / n).toFixed(1) + ' 次，最多的是第 ' + (g.maxIndex + 1) + ' ' + u + '（' + g.max + ' 次）。';
   }
 
   function stepText(st) {
@@ -162,7 +217,7 @@
     for (var i = 0; i < items.length; i++) {
       items[i].className = i < curIdx ? 'done' : (i === curIdx ? 'on' : '');
     }
-    $('cur').textContent = stepText(S.steps[curIdx]);
+    $('cur').textContent = stepText(S.steps[curIdx]) + '  [换色 ' + S.chg.perStep[curIdx] + ' 次]';
     $('prev').disabled = curIdx <= 0;
     $('next').disabled = curIdx >= S.steps.length - 1;
     if (scroll && items[curIdx]) {
@@ -182,6 +237,9 @@
     var l = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2];
     return l > 150 ? '#222' : '#fff';
   }
+  function tint(rgb) {   // 打印用：向白色靠拢，便于黑白打印时看清符号
+    return 'rgb(' + rgb.map(function (v) { return Math.round(v * 0.45 + 255 * 0.55); }).join(',') + ')';
+  }
   function cellSize() { return Math.max(12, Math.min(30, Math.floor(1800 / S.w))); }
 
   function drawChart(cv, opt) {
@@ -192,14 +250,14 @@
     var ox = M, oy = M, x, y;
     for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
       var p = S.palette[S.indices[y * w + x]];
-      g.fillStyle = p.hex; g.fillRect(ox + x * cs, oy + y * cs, cs, cs);
+      g.fillStyle = opt.print ? tint(p.rgb) : p.hex; g.fillRect(ox + x * cs, oy + y * cs, cs, cs);
     }
     if (opt.symbols) {
       g.font = 'bold ' + Math.floor(cs * 0.62) + 'px sans-serif';
       g.textAlign = 'center'; g.textBaseline = 'middle';
       for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
         var ci = S.indices[y * w + x];
-        g.fillStyle = textOn(S.palette[ci].rgb);
+        g.fillStyle = opt.print ? '#000' : textOn(S.palette[ci].rgb);
         g.fillText(symOf(ci), ox + x * cs + cs / 2, oy + y * cs + cs / 2 + 1);
       }
     }
@@ -298,35 +356,79 @@
     var a = document.createElement('a');
     a.href = url; a.download = name;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
   }
 
+  // 保存：先 flush 防抖生成；仅触屏设备且能分享文件时走 share（8 秒超时），否则下载 + 长按层
+  var saving = false;
+  function closeOverlay() { $('overlay').hidden = true; $('ovImg').removeAttribute('src'); }
   $('savePng').addEventListener('click', function () {
-    if (!S) return;
-    var cv = exportCanvas(), hint = $('saveHint');
-    function showOverlay(src) {
-      $('ovImg').src = src; $('overlay').hidden = false;
-    }
-    var done = false;
+    if (!S || saving) return;
+    saving = true; $('savePng').disabled = true;
+    var hint = $('saveHint');
+    function finish() { saving = false; $('savePng').disabled = false; }
     try {
-      cv.toBlob(function (blob) {
-        if (!blob) { showOverlay(cv.toDataURL('image/png')); hint.textContent = '已打开全屏图片，请长按保存。'; return; }
-        try { downloadBlob(blob, 'crochet-chart-' + S.w + 'x' + S.h + '.png'); done = true; } catch (e) { done = false; }
-        showOverlay(URL.createObjectURL(blob));
+      if (timer || genPending) {          // 有尚未执行的防抖/排队生成：立即生成，保证保存的是最新参数
+        clearTimeout(timer); timer = null; genToken++; genPending = false;
+        doGenerate(); $('status').textContent = '';
+      }
+      var cv = exportCanvas();
+      var fname = 'crochet-chart-' + S.w + 'x' + S.h + '.png';
+      var fallback = function (blob) {
+        var done = false;
+        if (blob) { try { downloadBlob(blob, fname); done = true; } catch (e) { done = false; } }
+        $('ovImg').src = cv.toDataURL('image/png'); $('overlay').hidden = false;
         hint.textContent = done ? '已触发下载；若没有反应，请在全屏图片上长按保存。' : '请在全屏图片上长按保存。';
+      };
+      cv.toBlob(function (blob) {
+        try {
+          var file = null;
+          try { if (blob) file = new File([blob], fname, { type: 'image/png' }); } catch (e) { file = null; }
+          var canShare = false;
+          try {
+            canShare = !!(file && window.matchMedia && window.matchMedia('(pointer:coarse)').matches &&
+              navigator.share && navigator.canShare && navigator.canShare({ files: [file] }));
+          } catch (e) { canShare = false; }
+          if (!canShare) { fallback(blob); finish(); return; }
+          var tm, timeout = new Promise(function (res) { tm = setTimeout(function () { res('timeout'); }, 8000); });
+          Promise.race([navigator.share({ files: [file], title: '钩针图纸' }), timeout]).then(function (r) {
+            clearTimeout(tm);
+            if (r === 'timeout') fallback(blob);
+            else hint.textContent = '已调出系统分享，可选择“存储图像”。';
+            finish();
+          }, function (e) {
+            clearTimeout(tm);
+            try { if (!(e && e.name === 'AbortError')) fallback(blob); } finally { finish(); }
+          });
+        } catch (e) {
+          try { fallback(blob); } finally { finish(); }
+        }
       }, 'image/png');
     } catch (e) {
-      showOverlay(cv.toDataURL('image/png'));
-      hint.textContent = '请在全屏图片上长按保存。';
+      try { $('ovImg').src = cv_safe(); $('overlay').hidden = false; } catch (e2) { hint.textContent = '保存失败：' + (e && e.message || e); }
+      finish();
     }
   });
-  $('closeOv').addEventListener('click', function () { $('overlay').hidden = true; });
+  function cv_safe() { return exportCanvas().toDataURL('image/png'); }
+  $('closeOv').addEventListener('click', closeOverlay);
+
+  // ---------- 打印 ----------
+  var printing = false;
+  function beforePrint() {
+    if (!S || printing) return;
+    printing = true;
+    drawChart($('chart'), { symbols: true, highlight: false, print: true });
+  }
+  function afterPrint() { if (!printing) return; printing = false; if (S) drawMain(); }
+  window.addEventListener('beforeprint', beforePrint);
+  window.addEventListener('afterprint', afterPrint);
+  $('printBtn').addEventListener('click', function () { if (S) window.print(); });
 
   $('saveTxt').addEventListener('click', function () {
     if (!S) return;
     var total = S.w * S.h, L = [];
     L.push('钩针图纸  ' + S.w + ' × ' + S.h + ' 格  ' + (S.tech === 'c2c' ? 'C2C 斜钩' : '提花挂毯钩'));
-    L.push('总格数 ' + total + '，颜色 ' + S.palette.length + ' 种');
+    L.push('总格数 ' + total + '，颜色 ' + S.palette.length + ' 种，全图换线 ' + S.chg.total + ' 次');
     L.push('', '【颜色图例】');
     S.palette.forEach(function (p, i) {
       L.push(symOf(i) + '  ' + p.name + '  ' + p.hex + '  ' + S.counts[i] + ' 格  ' + (S.counts[i] * 100 / total).toFixed(1) + '%');
@@ -340,5 +442,15 @@
     catch (e) { $('saveHint').textContent = '当前环境无法下载文件，请手动复制读针文字。'; }
   });
 
+  loadParams();
   updateLabels();
+  // 刷新后有进度但没图：提示重新选图
+  try {
+    var po = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+    if (po && po.sig && po.idx >= 0) {
+      $('resumeHint').textContent = '重新选择同一张图即可接着上次进度（第 ' + (po.idx + 1) + ' ' +
+        (/^c2c:/.test(po.sig) ? '条' : '行') + '）。';
+      $('resumeHint').hidden = false;
+    }
+  } catch (e) { /* 忽略 */ }
 })();
