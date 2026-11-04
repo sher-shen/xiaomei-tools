@@ -463,7 +463,9 @@ function closeOverlay() {
   overlayFrom = null;
 }
 async function flushRender() {
-  clearTimeout(timer); for (let i = 0; i < 5 && !(await render()); i++); // 保存前总是同步重绘，避免导出旧画面
+  // 保存前总是同步重绘，避免导出旧画面；render 被新设置作废时返回 false → 重试（最多 20 次）
+  clearTimeout(timer);
+  return window.ShufaCore.retryUntil(render, 20);
 }
 // 统一保存：手机（粗指针）优先系统分享，8 秒无响应/出错 → 下载 + 长按保存层
 async function saveCanvas(canvas, filename, btn) {
