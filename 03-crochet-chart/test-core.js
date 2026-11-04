@@ -85,4 +85,22 @@ const un = C.uniqueNames([{name:'朱红系',rgb:[200,54,42]},{name:'朱红系',r
 assert.deepStrictEqual(un, ['浅朱红系','深朱红系','灰系']); ok(true, '重名按明度加深/浅');
 const un3 = C.uniqueNames([{name:'A',rgb:[50,50,50]},{name:'A',rgb:[100,100,100]},{name:'A',rgb:[200,200,200]},{name:'A',rgb:[150,150,150]}]);
 assert.strictEqual(new Set(un3).size, 4); ok(true, '多重名仍保证唯一: ' + un3);
+// 边界：尺寸 / 进度 / 极小图
+cs = C.chartSize(40, 0, 0, 300); assert(cs.w >= 1 && cs.h >= 1 && isFinite(cs.w) && isFinite(cs.h)); ok(true, '0 尺寸图片不产生 NaN');
+cs = C.chartSize(NaN, 100, 100, 300); assert(cs.w === 1 && cs.h === 1); ok(true, '列数 NaN 退化为 1');
+cs = C.chartSize(10, 10000, 1, 300); assert.deepStrictEqual([cs.w, cs.h], [10, 1]); ok(true, '极扁图高度至少 1');
+cs = C.chartSize(10, 1, 10000, 300); assert.deepStrictEqual([cs.w, cs.h], [1, 300]); ok(true, '极窄图列数至少 1');
+assert.deepStrictEqual(C.parseProgress('{"sig":"c2c:4x4:1","idx":3}'), { sig: 'c2c:4x4:1', idx: 3 }); ok(true, '合法进度可解析');
+['', 'null', '{bad', '[]', '5', '{"sig":"a","idx":"3"}', '{"sig":"a","idx":-1}', '{"sig":"a","idx":1.5}', '{"idx":1}', '{"sig":1,"idx":1}']
+  .forEach(r => assert.strictEqual(C.parseProgress(r), null)); ok(true, '损坏/非法进度记录一律拒绝');
+assert.strictEqual(C.restoreIdx('{"sig":"x","idx":2}', 'x', 5), 2); assert.strictEqual(C.restoreIdx('{"sig":"x","idx":2}', 'y', 5), 0);
+assert.strictEqual(C.restoreIdx('{"sig":"x","idx":5}', 'x', 5), 0); ok(true, '进度仅在签名一致且未越界时恢复');
+const t1 = C.tapestryRows([0, 1, 1], 1, 3); assert.deepStrictEqual(t1.map(r => r.dir), ['←', '→', '←']); ok(true, '单列图每行一格');
+const c1 = C.c2cDiagonals([0, 1, 2, 3], 1, 4);
+assert.deepStrictEqual(c1.map(x => x.len), [1, 1, 1, 1]); assert.deepStrictEqual(c1.map(x => x.phase), ['inc', 'flat', 'flat', 'flat']);
+assert.deepStrictEqual(c1.map(x => x.runs[0].c), [3, 2, 1, 0]); ok(true, 'C2C 单列图：从右下起逐格向上');
+const c1r = C.c2cDiagonals([0, 1, 2, 3], 4, 1); assert.deepStrictEqual(c1r.map(x => x.runs[0].c), [3, 2, 1, 0]); ok(true, 'C2C 单行图：从右往左');
+const c11 = C.c2cDiagonals([7], 1, 1); assert.strictEqual(c11.length, 1); assert.strictEqual(C.colorChanges(c11).total, 0); ok(true, '1x1 图可读');
+assert.deepStrictEqual(C.kmeansPalette([], 4, 1), []); ok(true, '空像素 k-means 返回空');
+const one = C.assignPixels([[10, 10, 10]], 1, 1, [[0, 0, 0]], true); assert.deepStrictEqual(one, [0]); ok(true, '1x1 抖动不越界');
 console.log('\n全部通过 (' + n + ' 项)');

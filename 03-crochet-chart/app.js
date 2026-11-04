@@ -12,9 +12,15 @@
   var timer = null;
 
   // ---------- 输入 ----------
-  var thumbUrl = null;
+  var thumbUrl = null, loadTok = 0;
   function loadFile(f) {
-    if (!f || !/^image\//.test(f.type || 'image/')) return;
+    if (!f) return;
+    if (!/^image\//.test(f.type || 'image/')) {
+      $('resumeHint').textContent = '这不是图片文件，请选择 JPG / PNG / WebP 等图片。';
+      $('resumeHint').hidden = false;
+      return;
+    }
+    var tok = ++loadTok;
     $('resumeHint').hidden = true;
     var url = URL.createObjectURL(f);
     // 立刻显示缩略图
@@ -24,12 +30,14 @@
     $('srcinfo').textContent = (f.name || '图片') + '  读取中…';
     var img = new Image();
     img.onload = function () {
+      if (tok !== loadTok) return;     // 连续选图时只认最后一张
+      if (!img.naturalWidth || !img.naturalHeight) { img.onerror(); return; }
       srcImg = img; srcName = f.name || '图片';
       $('srcinfo').textContent = srcName + '  ' + img.naturalWidth + '×' + img.naturalHeight;
       $('gen').disabled = false;
       generate();
     };
-    img.onerror = function () { $('srcinfo').textContent = '这张图片无法读取，请换一张'; };
+    img.onerror = function () { if (tok !== loadTok) return; $('srcinfo').textContent = '这张图片无法读取，请换一张'; };
     img.src = url;
   }
   $('file').addEventListener('change', function (e) { loadFile(e.target.files && e.target.files[0]); });
@@ -76,12 +84,15 @@
     if (srcImg) {
       var z = calcSize();
       $('sizeInfo').textContent = '图纸大小 ' + z.w + ' × ' + z.h + ' 格' +
-        (z.adjusted ? '（已按比例把列数调整为 ' + z.w + '）' : '');
+        (z.adjusted ? '（已按图片比例/像素数把列数调整为 ' + z.w + '）' : '');
     }
   }
   function calcSize() {
     var r = C.cropRect(srcImg.naturalWidth, srcImg.naturalHeight, $('crop').value);
-    return C.chartSize(+$('cols').value, r.sw, r.sh, 300);
+    var want = +$('cols').value;
+    var z = C.chartSize(Math.min(want, r.sw), r.sw, r.sh, 300);   // 不超过原图像素数，避免放大出模糊渐变
+    if (z.w !== want) z.adjusted = true;
+    return z;
   }
   function schedule() {
     updateLabels(); saveParams();
@@ -153,10 +164,7 @@
   // ---------- 进度 ----------
   function restoreProgress() {
     curIdx = 0;
-    try {
-      var o = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
-      if (o && o.sig === S.sig && o.idx >= 0 && o.idx < S.steps.length) curIdx = o.idx;
-    } catch (e) { /* 忽略 */ }
+    try { curIdx = C.restoreIdx(localStorage.getItem(LS_KEY), S.sig, S.steps.length); } catch (e) { /* 忽略 */ }
   }
   function saveProgress() {
     try { localStorage.setItem(LS_KEY, JSON.stringify({ sig: S.sig, idx: curIdx })); } catch (e) { /* 忽略 */ }
@@ -206,7 +214,11 @@
     S.steps.forEach(function (st, i) {
       var li = document.createElement('li');
       li.textContent = stepText(st);
+      li.tabIndex = 0;
       li.addEventListener('click', function () { goto(i); });
+      li.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goto(i); }
+      });
       ol.appendChild(li);
     });
     markCurrent(false);
@@ -216,6 +228,7 @@
     var items = $('rows').children;
     for (var i = 0; i < items.length; i++) {
       items[i].className = i < curIdx ? 'done' : (i === curIdx ? 'on' : '');
+      if (i === curIdx) items[i].setAttribute('aria-current', 'step'); else items[i].removeAttribute('aria-current');
     }
     $('cur').textContent = stepText(S.steps[curIdx]) + '  [换色 ' + S.chg.perStep[curIdx] + ' 次]';
     $('prev').disabled = curIdx <= 0;
@@ -303,6 +316,8 @@
 
   function drawMain() {
     drawChart($('chart'), { symbols: $('showSym').checked, highlight: true });
+    $('chart').setAttribute('aria-label', '钩针图纸，' + S.w + ' 列 × ' + S.h + ' 行，' + S.palette.length +
+      ' 种颜色；当前读到' + (S.tech === 'c2c' ? '第 ' + (curIdx + 1) + ' 条对角线' : '第 ' + (curIdx + 1) + ' 行') + '。颜色与字母见下方图例。');
     applyZoom();
   }
   function applyZoom() {
@@ -361,7 +376,15 @@
 
   // 保存：先 flush 防抖生成；仅触屏设备且能分享文件时走 share（8 秒超时），否则下载 + 长按层
   var saving = false;
-  function closeOverlay() { $('overlay').hidden = true; $('ovImg').removeAttribute('src'); }
+  function closeOverlay() {
+    $('overlay').hidden = true; $('ovImg').removeAttribute('src');
+    try { $('savePng').focus(); } catch (e) { /* 忽略 */ }
+  }
+  function openOverlay(url) {
+    $('ovImg').src = url; $('overlay').hidden = false;
+    try { $('closeOv').focus(); } catch (e) { /* 忽略 */ }
+  }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('overlay').hidden) closeOverlay(); });
   $('savePng').addEventListener('click', function () {
     if (!S || saving) return;
     saving = true; $('savePng').disabled = true;
@@ -377,7 +400,7 @@
       var fallback = function (blob) {
         var done = false;
         if (blob) { try { downloadBlob(blob, fname); done = true; } catch (e) { done = false; } }
-        $('ovImg').src = cv.toDataURL('image/png'); $('overlay').hidden = false;
+        openOverlay(cv.toDataURL('image/png'));
         hint.textContent = done ? '已触发下载；若没有反应，请在全屏图片上长按保存。' : '请在全屏图片上长按保存。';
       };
       cv.toBlob(function (blob) {
@@ -405,11 +428,10 @@
         }
       }, 'image/png');
     } catch (e) {
-      try { $('ovImg').src = cv_safe(); $('overlay').hidden = false; } catch (e2) { hint.textContent = '保存失败：' + (e && e.message || e); }
+      try { openOverlay(exportCanvas().toDataURL('image/png')); } catch (e2) { hint.textContent = '保存失败：' + (e && e.message || e); }
       finish();
     }
   });
-  function cv_safe() { return exportCanvas().toDataURL('image/png'); }
   $('closeOv').addEventListener('click', closeOverlay);
 
   // ---------- 打印 ----------
@@ -417,7 +439,11 @@
   function beforePrint() {
     if (!S || printing) return;
     printing = true;
-    drawChart($('chart'), { symbols: true, highlight: false, print: true });
+    var cv = $('chart');
+    drawChart(cv, { symbols: true, highlight: false, print: true });
+    // A4 可用 190×245mm：按比例缩放，避免高图被拉出整页或被截断
+    var wmm = Math.min(190, 245 * cv.width / cv.height);
+    cv.style.width = wmm.toFixed(1) + 'mm'; cv.style.maxWidth = '100%';
   }
   function afterPrint() { if (!printing) return; printing = false; if (S) drawMain(); }
   window.addEventListener('beforeprint', beforePrint);
@@ -446,8 +472,8 @@
   updateLabels();
   // 刷新后有进度但没图：提示重新选图
   try {
-    var po = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
-    if (po && po.sig && po.idx >= 0) {
+    var po = C.parseProgress(localStorage.getItem(LS_KEY));
+    if (po) {
       $('resumeHint').textContent = '重新选择同一张图即可接着上次进度（第 ' + (po.idx + 1) + ' ' +
         (/^c2c:/.test(po.sig) ? '条' : '行') + '）。';
       $('resumeHint').hidden = false;

@@ -191,6 +191,7 @@
       return out;
     }
     var buf = pixels.map(function (p) { return [p[0], p[1], p[2]]; });
+    var spread = [[1, 0, 7 / 16], [-1, 1, 3 / 16], [0, 1, 5 / 16], [1, 1, 1 / 16]];
     for (var y = 0; y < h; y++) {
       for (var x = 0; x < w; x++) {
         var idx = y * w + x, cur = buf[idx];
@@ -199,7 +200,6 @@
         var b = nearest(cr);
         out[idx] = b;
         var err = [cc[0] - palette[b][0], cc[1] - palette[b][1], cc[2] - palette[b][2]];
-        var spread = [[1, 0, 7 / 16], [-1, 1, 3 / 16], [0, 1, 5 / 16], [1, 1, 1 / 16]];
         for (var s = 0; s < spread.length; s++) {
           var nx = x + spread[s][0], ny = y + spread[s][1];
           if (nx < 0 || nx >= w || ny >= h) continue;
@@ -356,6 +356,8 @@
    */
   function chartSize(cols, sw, sh, maxRows) {
     maxRows = maxRows || 300;
+    if (!(sw > 0) || !(sh > 0)) { sw = 1; sh = 1; }     // 防止 0/NaN 尺寸（如无固有尺寸的 SVG）
+    if (!isFinite(cols)) cols = 1;
     var w = Math.max(1, Math.round(cols));
     var h = Math.max(1, Math.round(w * sh / sw)), adjusted = false;
     if (h > maxRows) {
@@ -389,6 +391,23 @@
     });
   }
 
+  /**
+   * 解析 localStorage 里的进度记录。合法返回 {sig, idx}（idx 为非负整数），否则 null。
+   * 防止被改坏的数据（字符串下标等）让 curIdx 变成非数字。
+   */
+  function parseProgress(raw) {
+    var o;
+    try { o = JSON.parse(raw || 'null'); } catch (e) { return null; }
+    if (!o || typeof o !== 'object' || typeof o.sig !== 'string') return null;
+    if (typeof o.idx !== 'number' || !isFinite(o.idx) || o.idx < 0 || Math.floor(o.idx) !== o.idx) return null;
+    return { sig: o.sig, idx: o.idx };
+  }
+  /** 取回可用的进度下标：签名一致且在 [0,len) 内才采用，否则 0 */
+  function restoreIdx(raw, sig, len) {
+    var o = parseProgress(raw);
+    return (o && o.sig === sig && o.idx < len) ? o.idx : 0;
+  }
+
   var PHASE_NAME = { inc: '增针段', flat: '平段', dec: '减针段' };
 
   function formatRuns(rs, syms) {
@@ -407,7 +426,7 @@
     YARN: YARN, hexToRgb: hexToRgb, rgbToHex: rgbToHex, rgbToLab: rgbToLab, labDist2: labDist2,
     mulberry32: mulberry32, kmeansPalette: kmeansPalette, mapToYarn: mapToYarn, nearestName: nearestName,
     assignPixels: assignPixels, dedupePixels: dedupePixels, cleanIsolated: cleanIsolated, colorChanges: colorChanges, cropRect: cropRect, chartSize: chartSize, uniqueNames: uniqueNames, sortByCount: sortByCount, symbolFor: symbolFor,
-    tapestryRows: tapestryRows, c2cDiagonals: c2cDiagonals, diagCells: diagCells,
+    parseProgress: parseProgress, restoreIdx: restoreIdx, tapestryRows: tapestryRows, c2cDiagonals: c2cDiagonals, diagCells: diagCells,
     PHASE_NAME: PHASE_NAME, formatTapestryLine: formatTapestryLine, formatC2CLine: formatC2CLine
   };
 });
