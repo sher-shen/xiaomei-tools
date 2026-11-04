@@ -250,6 +250,22 @@
     };
   }
 
+  /**
+   * iOS Safari 画布保护：把期望缩放系数压到 宽×高 ≤ maxArea 且每边 ≤ maxSide。
+   * 返回 {scale, clamped, width, height}；scale ≤ wanted，宽高至少 1。非法输入按 1×1 处理。
+   */
+  function safeCanvasScale(w, h, wanted, maxArea, maxSide) {
+    maxArea = maxArea || 16000000; maxSide = maxSide || 8192;
+    w = w > 0 && isFinite(w) ? w : 1; h = h > 0 && isFinite(h) ? h : 1;
+    var want = wanted > 0 && isFinite(wanted) ? wanted : 1;
+    var s = Math.min(want, maxSide / w, maxSide / h, Math.sqrt(maxArea / (w * h)));
+    var cw = Math.max(1, Math.floor(w * s)), ch = Math.max(1, Math.floor(h * s));
+    while (cw > 1 && ch > 1 && (cw * ch > maxArea || cw > maxSide || ch > maxSide)) {
+      s *= 0.99; cw = Math.max(1, Math.floor(w * s)); ch = Math.max(1, Math.floor(h * s));
+    }
+    return { scale: s, clamped: s < want, width: cw, height: ch };
+  }
+
   function textOn(rgb) {
     var l = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2];
     return l > 150 ? '#222' : '#fff';
@@ -259,6 +275,6 @@
     hexToRgb: hexToRgb, rgbToLab: rgbToLab, labDist2: labDist2, SYMBOLS: SYMBOLS, symbolFor: symbolFor,
     dedupePixels: dedupePixels, selectColors: selectColors, assignPixels: assignPixels,
     cleanIsolated: cleanIsolated, sortByCount: sortByCount, makeChart: makeChart,
-    cropRect: cropRect, chartSize: chartSize, estimate: estimate, textOn: textOn
+    cropRect: cropRect, chartSize: chartSize, estimate: estimate, safeCanvasScale: safeCanvasScale, textOn: textOn
   };
 });
