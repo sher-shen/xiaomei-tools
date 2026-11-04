@@ -21,8 +21,8 @@
 <main>
   <!-- 预览 -->
   <section class="preview-wrap">
-    <div class="cvbox"><canvas id="cv" aria-label="壁纸预览"></canvas><div id="fontLoading" class="loading" role="status" hidden>字体加载中…</div></div>
-    <p id="warn" class="warn" hidden></p>
+    <div class="cvbox"><canvas id="cv" role="img" aria-label="壁纸预览"></canvas><div id="fontLoading" class="loading" role="status" hidden>字体加载中…</div></div>
+    <p id="warn" class="warn" role="status" hidden></p>
     <div class="actions">
       <button id="btnSave" class="primary" type="button">保存图片</button>
       <button id="btnReset" class="link" type="button">恢复默认</button>
@@ -41,7 +41,7 @@
 
     <h2>文字</h2>
     <label class="lab" for="text">正文（换行即分列）</label>
-    <textarea id="text" rows="4" placeholder="输入一句话或一首诗"></textarea>
+    <textarea id="text" rows="4" maxlength="600" placeholder="输入一句话或一首诗"></textarea>
     <label class="lab" for="sig">落款（可空）</label>
     <input id="sig" type="text" placeholder="如：小美 · 寒露" maxlength="16">
     <label class="check"><input id="keepPunc" type="checkbox"> 保留标点</label>
@@ -123,7 +123,7 @@
 </footer>
 
 <!-- 保存层：长按图片保存 -->
-<div id="overlay" class="overlay" hidden>
+<div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-label="保存图片" hidden>
   <p class="tip">长按图片保存</p>
   <img id="outImg" alt="生成的图片">
   <button id="btnClose" type="button">关闭</button>

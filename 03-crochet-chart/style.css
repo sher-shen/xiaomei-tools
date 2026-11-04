@@ -16,20 +16,21 @@ h2{margin:0 0 10px;font-size:17px;font-weight:600;border-left:3px solid var(--re
 .pick-main{display:block;font-size:18px;color:var(--red)}
 .pick-sub{display:block;font-size:12px;color:var(--ink2);margin-top:4px}
 #file{position:absolute;opacity:0;width:1px;height:1px}
+.pick:focus-within,#drop:has(#file:focus-visible) .pick{outline:2px solid var(--red);outline-offset:2px}
 .drag .pick{background:#f1e3d6;border-color:var(--red)}
 .row{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
 .row label{font-size:15px}
 output{font-weight:600;color:var(--red)}
 input[type=range]{width:100%;accent-color:var(--red)}
-select{font:inherit;padding:6px 8px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:4px;max-width:70%}
+select{font:inherit;min-height:44px;padding:6px 8px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:4px;max-width:70%}
 .checks{margin:12px 0;display:flex;flex-direction:column;gap:6px;font-size:14px}
 .checks input,.chk input{accent-color:var(--red);margin-right:6px}
 .btn{font:inherit;font-size:15px;border:1px solid var(--ink);background:transparent;color:var(--ink);
-  padding:9px 16px;border-radius:4px;cursor:pointer;min-height:42px}
+  padding:9px 16px;border-radius:4px;cursor:pointer;min-height:44px}
 .btn.primary{background:var(--red);border-color:var(--red);color:#fff}
 .btn.primary:active{background:var(--red2)}
 .btn:disabled{opacity:.4;cursor:not-allowed}
-.btn.small{padding:4px 10px;font-size:13px;min-height:34px}
+.btn.small{padding:4px 10px;font-size:13px;min-height:44px}
 #gen{width:100%}
 .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
 .chk{font-size:14px;margin-right:auto}
@@ -42,10 +43,11 @@ select{font:inherit;padding:6px 8px;border:1px solid var(--line);background:#fff
 .legend .ct{color:var(--ink2);font-size:12px;white-space:nowrap}
 .stepper{display:flex;gap:8px;align-items:stretch;margin:10px 0;position:sticky;top:0;background:var(--card);padding:6px 0;z-index:2}
 .stepper .btn{flex:none}
-.cur{flex:1;font-size:14px;border:1px solid var(--red);background:#fff;padding:6px 8px;border-radius:4px;min-height:42px;display:flex;align-items:center;word-break:break-all}
+.cur{flex:1;font-size:14px;border:1px solid var(--red);background:#fff;padding:6px 8px;border-radius:4px;min-height:44px;display:flex;align-items:center;word-break:break-all}
 .rows{margin:0;padding:0;list-style:none;max-height:50vh;overflow:auto;border:1px solid var(--line);background:#fff}
-.rows li{padding:6px 10px;border-bottom:1px solid #eee6d6;font-size:14px;cursor:pointer;word-break:break-all}
-.rows li.done{color:#aaa28f}
+.rows li{padding:11px 10px;border-bottom:1px solid #eee6d6;font-size:14px;cursor:pointer;word-break:break-all}
+.rows li.done{color:#7d7667}
+.rows li:focus-visible,.btn:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--red);outline-offset:1px}
 .rows li.on{background:#f3d9d3;border-left:4px solid var(--red);font-weight:600}
 .overlay{position:fixed;inset:0;background:#1b1a18;z-index:99;display:flex;flex-direction:column}
 .overlay[hidden]{display:none}
@@ -67,7 +69,7 @@ footer{text-align:center;color:var(--ink2);font-size:12px;padding:10px 16px 28px
   .card{border:0;padding:0;margin:0 0 6mm;background:#fff}
   h2{border-left:3px solid #000}
   .chart-wrap{overflow:visible;max-height:none;border:0}
-  #chart{width:100%!important;max-width:100%!important;height:auto;page-break-inside:avoid;break-inside:avoid}
+  #chart{max-width:100%!important;height:auto!important;max-height:245mm;page-break-inside:avoid;break-inside:avoid}
   .legend{grid-template-columns:repeat(2,1fr)}
   .legend li{border-color:#000;break-inside:avoid}
   .sw{border-color:#000;background:#fff!important;color:#000!important}

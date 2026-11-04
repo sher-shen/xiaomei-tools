@@ -21,27 +21,57 @@
   function unit(kind) { return kind === 'stitch' ? '格' : '颗'; }
 
   // ---------- 输入 ----------
-  var thumbUrl = null;
+  var thumbUrl = null, loadTok = 0, MAX_WORK = 1600;
+  // 分步折半缩小，避免一次缩得太多造成锯齿；放大时关闭平滑，保持像素画边缘清晰
+  function resample(s, sx, sy, sw, sh, dw, dh) {
+    var cur = s, cw = sw, ch = sh, x0 = sx, y0 = sy, t, tg;
+    while (cw >= dw * 2 || ch >= dh * 2) {
+      var nw = cw >= dw * 2 ? Math.ceil(cw / 2) : cw, nh = ch >= dh * 2 ? Math.ceil(ch / 2) : ch;
+      t = document.createElement('canvas'); t.width = nw; t.height = nh;
+      tg = t.getContext('2d'); tg.imageSmoothingEnabled = true; tg.imageSmoothingQuality = 'high';
+      tg.drawImage(cur, x0, y0, cw, ch, 0, 0, nw, nh);
+      cur = t; x0 = 0; y0 = 0; cw = nw; ch = nh;
+    }
+    var out = document.createElement('canvas'); out.width = dw; out.height = dh;
+    var g = out.getContext('2d', { willReadFrequently: true });
+    g.imageSmoothingEnabled = dw < cw || dh < ch;
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(cur, x0, y0, cw, ch, 0, 0, dw, dh);
+    return out;
+  }
   function setSource(img, name, w, h) {
-    src = img; srcName = name;
+    // 超大图先缩成工作副本（长边 ≤1600），之后每次生成都不必重新解码缩放大图
+    var m = Math.max(w, h);
+    src = m > MAX_WORK ? resample(img, 0, 0, w, h, Math.max(1, Math.round(w * MAX_WORK / m)), Math.max(1, Math.round(h * MAX_WORK / m))) : img;
+    srcName = name;
     $('srcrow').hidden = false;
     $('srcinfo').textContent = name + '  ' + w + '×' + h;
     $('gen').disabled = false;
     generate();
   }
   function loadFile(f) {
-    if (!f || !/^image\//.test(f.type || 'image/')) return;
-    var url = URL.createObjectURL(f);
+    if (!f) return;
+    if (!/^image\//.test(f.type || 'image/')) { $('srcrow').hidden = false; $('srcinfo').textContent = '这不是图片文件，请选择 JPG / PNG / WebP 等图片'; return; }
+    var tok = ++loadTok, url = URL.createObjectURL(f);
     if (thumbUrl) { try { URL.revokeObjectURL(thumbUrl); } catch (e) { /* 忽略 */ } }
     thumbUrl = url;
     $('thumb').src = url; $('srcrow').hidden = false;
     $('srcinfo').textContent = (f.name || '图片') + '  读取中…';
     var img = new Image();
-    img.onload = function () { setSource(img, f.name || '图片', img.naturalWidth, img.naturalHeight); };
-    img.onerror = function () { $('srcinfo').textContent = '这张图片无法读取，请换一张'; };
+    img.onload = function () {
+      if (tok !== loadTok) return;
+      if (!img.naturalWidth || !img.naturalHeight) { $('srcinfo').textContent = '这张图片没有明确的尺寸，请换一张'; return; }
+      setSource(img, f.name || '图片', img.naturalWidth, img.naturalHeight);
+    };
+    img.onerror = function () { if (tok === loadTok) $('srcinfo').textContent = '这张图片无法读取，请换一张'; };
     img.src = url;
   }
-  $('file').addEventListener('change', function (e) { loadFile(e.target.files && e.target.files[0]); });
+  $('file').addEventListener('change', function (e) {
+    loadFile(e.target.files && e.target.files[0]);
+    try { e.target.value = ''; } catch (err) { /* 忽略：允许再次选同一文件 */ }
+  });
+  // 拖到卡片外不要让浏览器直接打开图片
+  ['dragover', 'drop'].forEach(function (n) { window.addEventListener(n, function (e) { e.preventDefault(); }); });
   var drop = $('drop');
   ['dragenter', 'dragover'].forEach(function (n) {
     drop.addEventListener(n, function (e) { e.preventDefault(); drop.classList.add('drag'); });
@@ -84,6 +114,7 @@
   $('demo').addEventListener('click', function () {
     var cv = demoImage();
     if (thumbUrl) { try { URL.revokeObjectURL(thumbUrl); } catch (e) { /* 忽略 */ } thumbUrl = null; }
+    loadTok++;
     $('thumb').src = cv.toDataURL('image/png');
     setSource(cv, '示例图（小蘑菇）', cv.width, cv.height);
   });
@@ -102,16 +133,18 @@
   function loadParams() {
     try {
       var o = JSON.parse(localStorage.getItem(P_KEY) || 'null');
-      if (!o) return;
+      if (!o || typeof o !== 'object') return;
       P_IDS.forEach(function (id) {
-        if (o[id] == null) return;
+        var v = o[id];
+        if (typeof v !== 'string' && typeof v !== 'number') return;
         var el = $(id), old = el.value;
-        el.value = o[id];
+        if (el.type === 'range' && !isFinite(parseFloat(v))) return;
+        el.value = v;
         if (el.value === '' || (el.tagName === 'SELECT' && el.selectedIndex < 0)) el.value = old;
       });
       P_CHK.forEach(function (id) { if (typeof o[id] === 'boolean') $(id).checked = o[id]; });
-      var r = document.querySelector('input[name=mode][value="' + o.mode + '"]');
-      if (r) r.checked = true;
+      var modes = document.querySelectorAll('input[name=mode]');
+      for (var i = 0; i < modes.length; i++) if (modes[i].value === o.mode) modes[i].checked = true;
     } catch (e) { /* 忽略 */ }
   }
 
@@ -155,7 +188,7 @@
     setTimeout(function () {
       if (tok !== genToken) return;
       genPending = false;
-      try { doGenerate(); $('status').textContent = ''; }
+      try { $('status').textContent = doGenerate(); }
       catch (e) { $('status').textContent = '生成失败：' + (e && e.message || e); }
     }, 30);
   }
@@ -163,11 +196,8 @@
     var z = calcSize(), w = z.w, h = z.h, card = curCard();
     var sw = src.naturalWidth || src.width, sh = src.naturalHeight || src.height;
     var cr = C.cropRect(sw, sh, $('crop').value);
-    var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-    var cx = cv.getContext('2d');
-    cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high';
-    cx.drawImage(src, cr.sx, cr.sy, cr.sw, cr.sh, 0, 0, w, h);
-    var data = cx.getImageData(0, 0, w, h).data;
+    var cv = resample(src, cr.sx, cr.sy, cr.sw, cr.sh, w, h);
+    var data = cv.getContext('2d').getImageData(0, 0, w, h).data;
     var r = C.makeChart(data, w, h, card.colors, {
       k: +$('ncolors').value, transparent: $('transparent').checked,
       clean: $('clean').checked, dither: $('dither').checked
@@ -175,6 +205,7 @@
     r.card = card;
     S = r; focus = -1;
     render();
+    return r.colors.length ? '' : '图中没有可用的不透明像素（整张图都是透明的）。可取消“透明处留空”再试。';
   }
 
   // ---------- 渲染 ----------
@@ -200,6 +231,7 @@
     S.colors.forEach(function (c, i) {
       var li = document.createElement('li');
       li.setAttribute('role', 'button'); li.tabIndex = 0;
+      li.setAttribute('aria-label', '高亮 ' + C.symbolFor(i) + ' ' + c.code + ' ' + c.name + '，' + S.counts[i] + ' ' + u);
       if (i === focus) li.className = 'on';
       var sw = document.createElement('span');
       sw.className = 'sw'; sw.style.background = c.hex; sw.style.color = C.textOn(c.rgb);
@@ -222,7 +254,10 @@
   }
   function renderLegendState() {
     var items = $('legend').children;
-    for (var i = 0; i < items.length; i++) items[i].className = i === focus ? 'on' : '';
+    for (var i = 0; i < items.length; i++) {
+      items[i].className = i === focus ? 'on' : '';
+      items[i].setAttribute('aria-pressed', i === focus ? 'true' : 'false');
+    }
     $('focusInfo').textContent = focus >= 0
       ? '高亮：' + C.symbolFor(focus) + ' ' + S.colors[focus].code + '（' + S.counts[focus] + ' ' + unit(S.card.kind) + '）'
       : '';
@@ -289,6 +324,7 @@
 
   function drawMain() {
     drawChart($('chart'), { mode: mode(), focus: focus });
+    $('chart').setAttribute('aria-label', '拼豆图纸 ' + S.w + ' 列 × ' + S.h + ' 行，共 ' + S.colors.length + ' 色，详见下方用量清单');
     applyZoom();
   }
   function applyZoom() {
@@ -367,7 +403,15 @@
 
   // 保存：先 flush 防抖；仅触屏且能分享文件时走系统分享（8 秒超时），否则下载 + 长按保存层
   var saving = false;
-  function closeOverlay() { $('overlay').hidden = true; $('ovImg').removeAttribute('src'); }
+  function closeOverlay() {
+    $('overlay').hidden = true; $('ovImg').removeAttribute('src');
+    try { $('savePng').focus(); } catch (e) { /* 忽略 */ }
+  }
+  function openOverlay(url) {
+    $('ovImg').src = url; $('overlay').hidden = false;
+    try { $('closeOv').focus(); } catch (e) { /* 忽略 */ }
+  }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('overlay').hidden) closeOverlay(); });
   $('savePng').addEventListener('click', function () {
     if (!S || saving) return;
     saving = true; $('savePng').disabled = true;
@@ -376,14 +420,14 @@
     try {
       if (timer || genPending) {
         clearTimeout(timer); timer = null; genToken++; genPending = false;
-        doGenerate(); $('status').textContent = '';
+        $('status').textContent = doGenerate();
       }
       cv = exportCanvas();
       var fname = (S.card.kind === 'stitch' ? 'cross-stitch-' : 'bead-chart-') + S.w + 'x' + S.h + '.png';
       var fallback = function (blob) {
         var done = false;
         if (blob) { try { downloadBlob(blob, fname); done = true; } catch (e) { done = false; } }
-        $('ovImg').src = cv.toDataURL('image/png'); $('overlay').hidden = false;
+        openOverlay(cv.toDataURL('image/png'));
         hint.textContent = done ? '已触发下载；若没有反应，请在全屏图片上长按保存。' : '请在全屏图片上长按保存。';
       };
       cv.toBlob(function (blob) {

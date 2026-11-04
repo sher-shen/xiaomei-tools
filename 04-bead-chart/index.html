@@ -21,14 +21,14 @@
 <main>
   <section class="card" id="drop">
     <label class="pick" for="file">
+      <input type="file" id="file" accept="image/*">
       <span class="pick-main">选择图片</span>
       <span class="pick-sub">或把图片拖到这里 · 图片只在本机处理，不会上传</span>
     </label>
-    <input type="file" id="file" accept="image/*">
     <button class="btn small demo" id="demo">没有图？用示例图试试</button>
     <div class="srcrow" id="srcrow" hidden>
       <img id="thumb" class="thumb" alt="原图缩略图">
-      <div id="srcinfo" class="muted"></div>
+      <div id="srcinfo" class="muted" role="status"></div>
     </div>
   </section>
 
@@ -83,7 +83,7 @@
         <button class="btn small" id="zoomIn">放大</button>
         <span id="focusInfo" class="muted focus-info"></span>
       </div>
-      <div class="chart-wrap" id="chartWrap"><canvas id="chart"></canvas></div>
+      <div class="chart-wrap" id="chartWrap" tabindex="0" role="region" aria-label="图纸（可滚动）"><canvas id="chart" role="img" aria-label="拼豆图纸"></canvas></div>
       <div class="muted">粗线每 10 格一条；点下方用量清单里的颜色可单独高亮，再点一次取消。</div>
       <div class="toolbar">
         <button class="btn primary grow" id="savePng">保存图纸 PNG（含图例）</button>
@@ -99,7 +99,7 @@
   </div>
 </main>
 
-<div id="overlay" class="overlay" hidden>
+<div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-label="长按保存图片" hidden>
   <div class="overlay-bar"><span>长按图片，选择“保存图片”</span><button class="btn small" id="closeOv">关闭</button></div>
   <div class="overlay-body"><img id="ovImg" alt="拼豆图纸"></div>
 </div>

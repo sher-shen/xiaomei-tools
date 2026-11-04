@@ -35,7 +35,7 @@
   <section class="card noprint" id="params">
     <div class="row">
       <label for="cols">格子宽度（列数）</label>
-      <output id="colsOut">40</output>
+      <output id="colsOut" for="cols">40</output>
     </div>
     <input type="range" id="cols" min="10" max="150" value="40">
     <div class="muted" id="sizeInfo">高度按图片比例自动计算</div>
@@ -50,7 +50,7 @@
 
     <div class="row">
       <label for="ncolors">颜色数</label>
-      <output id="ncolorsOut">6</output>
+      <output id="ncolorsOut" for="ncolors">6</output>
     </div>
     <input type="range" id="ncolors" min="2" max="16" value="6">
 
@@ -80,7 +80,7 @@
         <button class="btn small" id="zoomFit">适应宽度</button>
         <button class="btn small" id="zoomIn">放大</button>
       </div>
-      <div class="chart-wrap" id="chartWrap"><canvas id="chart"></canvas></div>
+      <div class="chart-wrap" id="chartWrap"><canvas id="chart" role="img" aria-label="钩针图纸"></canvas></div>
       <div class="muted noprint">第 1 行在最下方；粗线每 10 格一条；编号从左、从下数起。</div>
       <div class="toolbar noprint">
         <button class="btn" id="savePng">保存图纸 PNG</button>
@@ -102,7 +102,7 @@
       <div id="readNote" class="muted"></div>
       <div class="stepper noprint">
         <button class="btn" id="prev">上一行</button>
-        <div id="cur" class="cur"></div>
+        <div id="cur" class="cur" aria-live="polite"></div>
         <button class="btn primary" id="next">下一行</button>
       </div>
       <ol id="rows" class="rows"></ol>
@@ -110,7 +110,7 @@
   </div>
 </main>
 
-<div id="overlay" class="overlay" hidden>
+<div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-label="长按保存图纸" hidden>
   <div class="overlay-bar"><span>长按图片，选择“保存图片”</span><button class="btn small" id="closeOv">关闭</button></div>
   <div class="overlay-body"><img id="ovImg" alt="钩针图纸"></div>
 </div>

@@ -25,6 +25,9 @@ img.th{max-width:140px;max-height:140px;border:1px solid var(--line);display:blo
 .ov .bar button{color:#f6f1e6;border-color:#f6f1e6;margin:0}
 .ov .body{flex:1;overflow:auto;text-align:center}
 .ov img{max-width:100%;background:#fff}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.btn:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.btn:disabled{opacity:.5}
 </style>
 </head>
 <body>
@@ -32,6 +35,7 @@ img.th{max-width:140px;max-height:140px;border:1px solid var(--line);display:blo
 <p class="sub">在小红书小工具里打开本页，截图或点“复制报告”发给我</p>
 
 <div class="card" id="t1"><h2>1 照片上传</h2>
+  <label for="f" class="sr">选择一张照片</label>
   <input type="file" id="f" accept="image/*">
   <div id="r1"></div></div>
 
@@ -55,9 +59,10 @@ img.th{max-width:140px;max-height:140px;border:1px solid var(--line);display:blo
   <button class="btn primary" id="copy">复制报告</button>
   <button class="btn" id="rerun">重新运行全部</button>
   <div id="r5" class="res"></div>
+  <label for="rep" class="sr">测试报告文本</label>
   <textarea id="rep" rows="8" style="width:100%;font-size:12px;margin-top:6px" readonly></textarea></div>
 
-<div class="ov" id="ov" hidden><div class="bar"><span>长按图片，选择“保存图片”</span><button class="btn" id="cl">关闭</button></div><div class="body"><img id="oi" alt="测试图"></div></div>
+<div class="ov" id="ov" role="dialog" aria-modal="true" aria-label="保存图片测试" hidden><div class="bar"><span>长按图片，选择“保存图片”</span><button class="btn" id="cl">关闭</button></div><div class="body"><img id="oi" alt="测试图"></div></div>
 
 <script>
 (function () {
@@ -116,17 +121,34 @@ img.th{max-width:140px;max-height:140px;border:1px solid var(--line);display:blo
           var url = URL.createObjectURL(b), a = document.createElement('a');
           a.href = url; a.download = 'sandbox-test.png';
           document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
           add('r2', true, '<a download> 点击未抛异常（是否真的保存了文件请你手动确认）');
         } catch (e) { add('r2', false, '<a download> 抛异常 ' + err(e)); }
         try {
-          $('oi').src = URL.createObjectURL(b); $('ov').hidden = false;
+          openOv(b);
           add('r2', true, '已打开全屏 <img>：请长按图片，看有没有“保存图片”（需你手动确认）');
         } catch (e) { add('r2', false, '全屏 img 失败 ' + err(e)); }
       }, 'image/png');
     } catch (e) { add('r2', false, 'toBlob 异常 ' + err(e)); }
   }
   $('b2').addEventListener('click', runCanvas);
-  $('cl').addEventListener('click', function () { $('ov').hidden = true; });
+  var ovFrom = null, ovUrl = '';
+function openOv(blob) {
+  if (ovUrl) URL.revokeObjectURL(ovUrl);
+  ovUrl = URL.createObjectURL(blob); $('oi').src = ovUrl;
+  ovFrom = document.activeElement; $('ov').hidden = false; $('cl').focus();
+}
+function closeOv() {
+  if ($('ov').hidden) return;
+  $('ov').hidden = true; $('oi').removeAttribute('src');
+  if (ovUrl) { URL.revokeObjectURL(ovUrl); ovUrl = ''; }
+  if (ovFrom && ovFrom.focus) ovFrom.focus();
+}
+$('cl').addEventListener('click', closeOv);
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') closeOv();
+  else if (e.key === 'Tab' && !$('ov').hidden) { e.preventDefault(); $('cl').focus(); }
+});
 
   // 3 字体
   function runFont() {
@@ -187,6 +209,7 @@ img.th{max-width:140px;max-height:140px;border:1px solid var(--line);display:blo
     if (typeof navigator.share !== 'function') { add('r6', false, 'navigator.share 不存在'); return; }
     btn.disabled = true;
     makeCanvas().toBlob(function (b) {
+      if (!b) { btn.disabled = false; add('r6', false, 'toBlob 返回 null'); return; }
       var file, t0 = Date.now(), tm, done = false;
       function end(ok, text) {
         if (done) return; done = true; clearTimeout(tm); btn.disabled = false;

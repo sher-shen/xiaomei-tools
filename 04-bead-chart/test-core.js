@@ -41,6 +41,17 @@ ok(r.counts.reduce((a, b) => a + b, 0) === 2, '空格不计数');
 r = C.makeChart(rgbaOf([[0, 0, 0, 0], [0, 0, 0, 255]]), 2, 1, card, { k: 4, transparent: false });
 ok(r.empty === 0 && r.colors[r.indices[0]].code === 'W', '不留空时透明按白底合成');
 
+// 3b) 留空模式下半透明边缘保留原色，不被白底冲淡
+r = C.makeChart(rgbaOf([[0, 0, 0, 128]]), 1, 1, card, { k: 4, transparent: true });
+ok(r.colors[r.indices[0]].code === 'K', '留空模式：半透明黑保持黑色而非被冲成白');
+// 3c) 全透明图不崩溃
+r = C.makeChart(rgbaOf([[0, 0, 0, 0], [9, 9, 9, 0]]), 2, 1, card, { k: 4, transparent: true });
+ok(r.colors.length === 0 && r.empty === 2 && r.indices.every(v => v === -1), '全透明图：无颜色、全空格');
+// 3d) 极端比例与 1×1
+ok(C.chartSize(40, 1000, 1, 150).h === 1 && C.chartSize(40, 1, 1000, 150).w >= 1, '极端长宽比至少 1 格');
+r = C.makeChart(rgbaOf([[250, 0, 0]]), 1, 1, card, { k: 12 });
+ok(r.colors.length === 1 && r.counts[0] === 1, '1×1 图可生成');
+
 // 4) 确定性
 const big = new Uint8ClampedArray(60 * 60 * 4);
 for (let i = 0; i < 3600; i++) big.set([(i * 37) % 256, (i * 91) % 256, (i * 53) % 256, 255], i * 4);

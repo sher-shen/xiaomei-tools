@@ -48,7 +48,6 @@ const el = {
   warn: $('warn'), term: $('term'), termHint: $('termHint')
 };
 const radio = name => document.querySelector('input[name="' + name + '"]:checked').value;
-const FONT_FAMS = ['MaShanZheng', 'ZhiMangXing', 'LiuJianMaoCao', 'LongCang'];
 
 /* ---------- 工具 ---------- */
 function mulberry32(a) { // 可复现的伪随机，保证预览不闪烁
@@ -67,9 +66,15 @@ const fontReady = {}, famLoaded = {};
 function loadFont(fam, sample) {
   const key = fam + '|' + sample;
   if (!fontReady[key]) {
-    fontReady[key] = document.fonts.load('64px "' + fam + '"', sample || '书')
-      .catch(function () { /* 加载失败则回退系统字体 */ })
-      .then(function () { famLoaded[fam] = true; });
+    // 加载失败或 10 秒无响应：回退系统字体，且不缓存失败结果（下次重绘可重试）
+    const load = document.fonts && document.fonts.load
+      ? document.fonts.load('64px "' + fam + '"', sample || '书').then(function () { return true; }, function () { return false; })
+      : Promise.resolve(false);
+    const timeout = new Promise(function (res) { setTimeout(function () { res(false); }, 10000); });
+    fontReady[key] = Promise.race([load, timeout]).then(function (ok) {
+      famLoaded[fam] = true;
+      if (!ok) delete fontReady[key];
+    });
   }
   return fontReady[key];
 }
@@ -308,7 +313,7 @@ async function render() {
   const needWait = !famLoaded[fam] || !famLoaded.MaShanZheng;
   if (needWait) $('fontLoading').hidden = false;
   await Promise.all([loadFont(fam, sample), loadFont('MaShanZheng', seal.join(''))]);
-  if (token !== renderToken) return;
+  if (token !== renderToken) return false;
   $('fontLoading').hidden = true;
 
   if (cv.width !== W) cv.width = W;
@@ -326,6 +331,7 @@ async function render() {
   // 同步小印章预览
   const sp = el.sealPrev, sc = makeSeal(sp.width);
   sp.getContext('2d').clearRect(0, 0, sp.width, sp.height); sp.getContext('2d').drawImage(sc, 0, 0);
+  return true;
 }
 
 // 画单个字：缺字 → 灰色占位
@@ -446,15 +452,25 @@ function stampSeal(g, sealCv, x, y, size, dark) {
 }
 
 /* ---------- 保存 / 导出 ---------- */
-function closeOverlay() { $('overlay').hidden = true; $('outImg').removeAttribute('src'); }
+let overlayFrom = null;
+function openOverlay() {
+  $('overlay').hidden = false; $('btnClose').focus();
+}
+function closeOverlay() {
+  if ($('overlay').hidden) return;
+  $('overlay').hidden = true; $('outImg').removeAttribute('src');
+  if (overlayFrom && overlayFrom.focus) overlayFrom.focus();
+  overlayFrom = null;
+}
 async function flushRender() {
-  if (timerActive || pending) { clearTimeout(timer); timerActive = false; await render(); }
+  clearTimeout(timer); for (let i = 0; i < 5 && !(await render()); i++); // 保存前总是同步重绘，避免导出旧画面
 }
 // 统一保存：手机（粗指针）优先系统分享，8 秒无响应/出错 → 下载 + 长按保存层
 async function saveCanvas(canvas, filename, btn) {
   const all = [$('btnSave'), $('btnSeal'), $('btnCard')];
   if (all.some(b => b.disabled)) return;
   const label = btn.textContent;
+  overlayFrom = btn; // 关闭保存层后焦点回到触发按钮
   all.forEach(b => b.disabled = true); btn.textContent = '正在生成…';
   let tid = 0, url = '';
   try {
@@ -481,7 +497,7 @@ async function saveCanvas(canvas, filename, btn) {
       const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
       const u = url; setTimeout(function () { URL.revokeObjectURL(u); }, 10000); url = '';
     } catch (e) { /* 忽略 */ }
-    $('outImg').src = canvas.toDataURL('image/png'); $('overlay').hidden = false;
+    $('outImg').src = canvas.toDataURL('image/png'); openOverlay();
   } catch (e) {
     alert('生成失败，请重试');
   } finally {
@@ -521,6 +537,10 @@ $('btnCard').addEventListener('click', function () {
 });
 $('btnClose').addEventListener('click', closeOverlay);
 $('overlay').addEventListener('click', function (e) { if (e.target === this) closeOverlay(); });
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') closeOverlay();
+  else if (e.key === 'Tab' && !$('overlay').hidden) { e.preventDefault(); $('btnClose').focus(); } // 层内唯一可聚焦元素：焦点不外溢
+});
 
 /* ---------- 节气 ---------- */
 function recommendTerm(now) {
@@ -606,9 +626,9 @@ function resetAll() {
 }
 
 /* ---------- 事件 ---------- */
-let pending = false, timer = 0, timerActive = false;
+let pending = false, timer = 0;
 function schedule() { if (pending) return; pending = true; requestAnimationFrame(function () { pending = false; render(); }); }
-function debounced() { clearTimeout(timer); timerActive = true; timer = setTimeout(function () { timerActive = false; schedule(); }, 150); }
+function debounced() { clearTimeout(timer); timer = setTimeout(schedule, 150); }
 ['input', 'change'].forEach(function (ev) {
   document.querySelector('main').addEventListener(ev, function (e) {
     if (e.target === el.term) return;
@@ -616,7 +636,7 @@ function debounced() { clearTimeout(timer); timerActive = true; timer = setTimeo
     syncLabels(); saveState();
     // 文字/滑块输入时防抖；单选、下拉、勾选立即重绘
     if (ev === 'input' && (e.target.tagName === 'TEXTAREA' || e.target.type === 'text' || e.target.type === 'range')) debounced();
-    else { clearTimeout(timer); timerActive = false; schedule(); }
+    else { clearTimeout(timer); schedule(); }
   });
 });
 

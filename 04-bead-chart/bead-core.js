@@ -188,9 +188,9 @@
     for (i = 0; i < w * h; i++) {
       var a = rgba[i * 4 + 3];
       if (opt.transparent && a < 128) { px[i] = null; continue; }
-      // 半透明按白底合成
+      // 留空模式下保留原色（否则抠图边缘会被白底冲淡成一圈浅色）；不留空时半透明按白底合成
       var r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2];
-      if (a < 255) { var t = a / 255; r = Math.round(r * t + 255 * (1 - t)); g = Math.round(g * t + 255 * (1 - t)); b = Math.round(b * t + 255 * (1 - t)); }
+      if (a < 255 && !opt.transparent) { var t = a / 255; r = Math.round(r * t + 255 * (1 - t)); g = Math.round(g * t + 255 * (1 - t)); b = Math.round(b * t + 255 * (1 - t)); }
       px[i] = [r, g, b]; opaque.push(px[i]);
     }
     var cardRgb = card.map(function (c) { return hexToRgb(c.hex); });
