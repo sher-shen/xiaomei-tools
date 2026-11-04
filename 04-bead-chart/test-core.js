@@ -89,4 +89,8 @@ q = C.safeCanvasScale(0, NaN, -1);
 ok(q.width === 1 && q.height === 1 && q.scale > 0, '非法输入不崩溃');
 q = C.safeCanvasScale(1, 100000, 1);
 ok(q.height <= 8192 && q.width >= 1, '极端细长画布宽至少 1');
+q = C.safeCanvasScale(3000, 3000, 2, -5, NaN);
+ok(q.width > 0 && q.height > 0 && q.width * q.height <= 16e6, '非法 maxArea/maxSide 回落默认值（不产生 NaN）');
+q = C.safeCanvasScale(1e8, 1, 1, 16e6, 1e9);
+ok(q.width * q.height <= 16e6, '自定义宽松 maxSide 时面积仍受限（' + q.width + '×' + q.height + '）');
 console.log('\n全部通过 (' + n + ' 项)');
