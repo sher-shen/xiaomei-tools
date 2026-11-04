@@ -476,7 +476,7 @@ async function saveCanvas(canvas, filename, btn) {
   all.forEach(b => b.disabled = true); btn.textContent = '正在生成…';
   let tid = 0, url = '';
   try {
-    await flushRender();
+    if (!(await flushRender())) { alert('设置仍在变化，画面未能更新到最新，请稍后重试'); return; } // 不导出旧画面
     if (typeof canvas === 'function') canvas = await canvas();
     const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
     if (!blob) { alert('生成失败，请重试'); return; }
