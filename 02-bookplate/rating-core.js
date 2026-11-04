@@ -2,7 +2,7 @@
 (function (root) {
   'use strict';
   function norm(s) {
-    return String(s == null ? '' : s).normalize('NFKC').replace(/[《》\u241f]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+    return String(s == null ? '' : s).normalize('NFKC').replace(/[《》\u241f\u200b-\u200d\u2060\ufeff]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
   }
   // 基础键：规范化书名 + 作者；书名为空 → ''（无键，不可评分）
   function baseKey(title, author) {
@@ -42,12 +42,13 @@
     try {
       if (!saved || typeof saved !== 'object') return empty;
       books = Array.isArray(books) ? books : [];
+      var rv = typeof saved.rv === 'number' ? saved.rv : 0; // 字符串 "3" 之类不可信，按旧版处理
       var keys = assignKeys(books), rk = {}, bk = '';
-      if (saved.rv >= 3) { // 未来版本（rv>3）按 rv3 结构尽力读取，不当成旧版按书名误迁移
+      if (rv >= 3) { // 未来版本（rv>3）按 rv3 结构尽力读取，不当成旧版按书名误迁移
         return { rk: cleanMap(saved.ratings), bk: typeof saved.best === 'string' ? saved.best : '' };
       }
       var r = saved.ratings && typeof saved.ratings === 'object' && !Array.isArray(saved.ratings) ? saved.ratings : {};
-      if (saved.rv === 2) { // 按下标
+      if (rv === 2) { // 按下标
         Object.keys(r).forEach(function (k) {
           var v = validStar(r[k]);
           if (/^\d+$/.test(k) && String(+k) === k && +k < keys.length && keys[+k] && v) rk[keys[+k]] = v;

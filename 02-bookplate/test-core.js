@@ -70,4 +70,9 @@ m = C.migrate({ rv: 2, ratings: { 0: 5, '00': 1, '01': 2 }, best: 0 }, books);
 assert.deepStrictEqual(m.rk, { [k0(0)]: 5 }); ok(true, 'rv2 非规范下标键（00/01）丢弃，不覆盖');
 assert.notStrictEqual(C.baseKey('a\u241fb', 'c'), C.baseKey('a', 'b\u241fc')); ok(true, '书名/作者含分隔符不串键');
 
+// 第 2 轮加固
+assert.strictEqual(C.baseKey('红楼梦\u200b', '曹\ufeff雪芹'), C.baseKey('红楼梦', '曹雪芹')); ok(true, '零宽字符/BOM 不影响键');
+m = C.migrate({ rv: '3', ratings: { [k0(0)]: 5 }, best: k0(0) }, books);
+assert.deepStrictEqual(m, { rk: {}, bk: '' }); ok(true, 'rv 为字符串不当作新版结构（按旧版处理，不误读）');
+
 console.log(n + ' checks passed');
