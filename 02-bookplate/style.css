@@ -76,3 +76,5 @@ button:active{opacity:.8}
   .stage{flex:1;position:sticky;top:12px}
   #cv{max-height:calc(100vh - 150px);width:auto}
 }
+/* 触控目标 ≥44px */
+button,select{min-height:44px}

@@ -67,3 +67,8 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,input:focus-visible,
 button:disabled{opacity:.45;cursor:default}
 button.link{border:none;background:none;color:var(--mute);text-decoration:underline;font-size:13px;padding:10px 8px;margin-top:6px}
 .warn.soft{color:var(--ink);background:#efe9da}
+/* 触控目标 ≥44px */
+button,select{min-height:44px}
+input[type=range]{min-height:44px}
+.seg label>span,.seg label>div{min-height:44px;display:flex;align-items:center;justify-content:center}
+.row label:has(input[type=checkbox]),label:has(>input[type=checkbox]){min-height:44px;display:flex;align-items:center;gap:6px}

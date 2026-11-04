@@ -78,3 +78,6 @@ footer{text-align:center;color:var(--ink2);font-size:12px;padding:10px 16px 28px
   #rowsCard,#legendCard{break-before:auto}
   #rowsCard{break-before:page}
 }
+/* 触控目标 ≥44px */
+input[type=range]{min-height:44px}
+label:has(>input[type=checkbox]){min-height:44px;display:flex;align-items:center;gap:6px}
