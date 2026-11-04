@@ -152,16 +152,18 @@
 
   // ---------- 进度 ----------
   function loadStore() {
-    var raw = localStorage.getItem(LS_KEY2);
-    if (raw == null) raw = localStorage.getItem(LS_KEY);   // 迁移旧单条数据
-    return C.parseProgressStore(raw);
+    try {
+      var raw = localStorage.getItem(LS_KEY2);
+      if (raw == null) raw = localStorage.getItem(LS_KEY);   // 迁移旧单条数据
+      return C.parseProgressStore(raw);
+    } catch (e) { return []; }   // 读取抛错时仍允许写入新进度
   }
   function restoreProgress() {
     curIdx = 0;
     try { curIdx = C.findProgressIdx(loadStore(), S.sig, S.steps.length); } catch (e) { /* 忽略 */ }
   }
   function saveProgress() {
-    try { localStorage.setItem(LS_KEY2, C.serializeProgressStore(C.touchProgress(loadStore(), S.sig, curIdx, Date.now()))); } catch (e) { /* 忽略 */ }
+    try { C.saveProgressStore(C.touchProgress(loadStore(), S.sig, curIdx, Date.now()), function (s) { localStorage.setItem(LS_KEY2, s); }); } catch (e) { /* 忽略 */ }
   }
 
   // ---------- 渲染 ----------

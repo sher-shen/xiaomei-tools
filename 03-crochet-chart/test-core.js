@@ -119,6 +119,22 @@ const one = C.assignPixels([[10, 10, 10]], 1, 1, [[0, 0, 0]], true); assert.deep
   const mix = C.parseProgressStore('{"items":[{"sig":"a","idx":1},{"sig":"a","idx":2},{"sig":1,"idx":1},{"sig":"b","idx":-1},null,{"sig":"c","idx":"3"},{"sig":"d","idx":4}]}');
   assert.deepStrictEqual(mix.map(x => x.sig), ['a', 'd']); ok(true, '损坏/重复条目被丢弃，好条目保留');
 }
+// 第 1 轮加固
+{
+  assert.strictEqual(C.touchProgress([], 'A', NaN, 1)[0].idx, 0);
+  assert.strictEqual(C.touchProgress([], 'A', -3, 1)[0].idx, 0);
+  assert.deepStrictEqual(C.touchProgress([{ sig: 'x', idx: 1, t: 0 }], 5, 1, 1), [{ sig: 'x', idx: 1, t: 0 }]);
+  assert.strictEqual(C.touchProgress([], 'A', 1, NaN)[0].t, 0);
+  assert.strictEqual(C.touchProgress([{ sig: 'a', idx: 1, t: 0 }, { sig: 'b', idx: 1, t: 0 }], 'c', 1, 1, -1).length, 3);
+  ok(true, 'touchProgress：非法 idx/sig/now/max 不写坏存档');
+  const mk = C.makeQuantCache(-1); mk.put('a', 1); mk.put('b', 2); assert.strictEqual(Object.keys(mk.map).length, 2); ok(true, '缓存容量非法时回落默认（不死循环）');
+  assert.deepStrictEqual(C.parseProgressStore('{"items":[{"sig":"__proto__","idx":1},{"sig":"constructor","idx":2}]}').map(x => x.sig), ['__proto__', 'constructor']); ok(true, '特殊签名不被误判重复');
+  // 配额满：写入失败时从最旧开始丢弃
+  const items = ['a', 'b', 'c', 'd'].map((s, i) => ({ sig: s, idx: i, t: i }));
+  let wrote; const w = (lim) => (str) => { if (JSON.parse(str).items.length > lim) throw new Error('Quota'); wrote = str; };
+  assert.strictEqual(C.saveProgressStore(items, w(2)), 2); assert.deepStrictEqual(JSON.parse(wrote).items.map(x => x.sig), ['a', 'b']); ok(true, '配额满：丢最旧后写入成功，最新保留');
+  assert.strictEqual(C.saveProgressStore(items, w(0)), 0); assert.strictEqual(C.saveProgressStore([], w(9)), 0); ok(true, '完全写不进去 → 返回 0 不抛错');
+}
 // 量化缓存
 {
   const px = []; for (let i = 0; i < 64; i++) px.push([(i * 37) % 256, (i * 91) % 256, (i * 13) % 256]);

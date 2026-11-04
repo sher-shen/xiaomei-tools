@@ -416,7 +416,7 @@
     try { o = JSON.parse(raw || 'null'); } catch (e) { return []; }
     if (!o || typeof o !== 'object') return [];
     var list = Array.isArray(o.items) ? o.items : (typeof o.sig === 'string' ? [o] : []);
-    var out = [], seen = {};
+    var out = [], seen = Object.create(null);
     list.forEach(function (it) {
       if (!it || typeof it !== 'object' || typeof it.sig !== 'string' || seen[it.sig]) return;
       if (typeof it.idx !== 'number' || !isFinite(it.idx) || it.idx < 0 || Math.floor(it.idx) !== it.idx) return;
@@ -427,9 +427,13 @@
   }
   /** 记录某图纸进度并置于最前（LRU），返回新数组，超出上限丢最旧 */
   function touchProgress(items, sig, idx, now, max) {
-    max = max || MAX_PROGRESS;
-    var rest = (items || []).filter(function (it) { return it.sig !== sig; });
-    rest.unshift({ sig: sig, idx: idx, t: now || 0 });
+    max = max >= 1 ? Math.floor(max) : MAX_PROGRESS;   // 负数/NaN/0 → 默认上限
+    items = Array.isArray(items) ? items : [];
+    if (typeof sig !== 'string') return items.slice(0, max);                        // 无效签名不记录
+    if (typeof idx !== 'number' || !isFinite(idx) || idx < 0) idx = 0;               // NaN/负数不写坏存档
+    idx = Math.floor(idx);
+    var rest = items.filter(function (it) { return it && it.sig !== sig; });
+    rest.unshift({ sig: sig, idx: idx, t: (typeof now === 'number' && isFinite(now)) ? now : 0 });
     return rest.slice(0, max);
   }
   /** 取某图纸的进度下标：存在且未越界才采用，否则 0 */
@@ -440,6 +444,14 @@
     return 0;
   }
   function serializeProgressStore(items) { return JSON.stringify({ v: 2, items: items }); }
+  /** 写入进度仓库；write(str) 抛错（如 localStorage 配额满）时从最旧的开始丢，直到写入成功或只剩 1 条。返回实际写入的条数（0=失败） */
+  function saveProgressStore(items, write) {
+    items = (items || []).slice();
+    while (items.length) {
+      try { write(serializeProgressStore(items)); return items.length; } catch (e) { items.pop(); }
+    }
+    return 0;
+  }
 
   /* ---------- 量化结果缓存（技法不影响，换技法不重跑 k-means） ---------- */
   function pixelsKey(px) {
@@ -480,7 +492,7 @@
     return copy(res, false);
   }
   function makeQuantCache(max) {
-    max = max || 4;
+    max = max >= 1 ? Math.floor(max) : 4;   // 负数/NaN → 默认，避免 while 死循环
     var c = { map: {}, order: [] };
     c.touch = function (k) { c.order = c.order.filter(function (x) { return x !== k; }); c.order.push(k); };
     c.put = function (k, v) {
@@ -508,7 +520,7 @@
     YARN: YARN, hexToRgb: hexToRgb, rgbToHex: rgbToHex, rgbToLab: rgbToLab, labDist2: labDist2,
     mulberry32: mulberry32, kmeansPalette: kmeansPalette, mapToYarn: mapToYarn, nearestName: nearestName,
     assignPixels: assignPixels, dedupePixels: dedupePixels, cleanIsolated: cleanIsolated, colorChanges: colorChanges, cropRect: cropRect, chartSize: chartSize, uniqueNames: uniqueNames, sortByCount: sortByCount, symbolFor: symbolFor,
-    parseProgressStore: parseProgressStore, touchProgress: touchProgress, findProgressIdx: findProgressIdx, serializeProgressStore: serializeProgressStore,
+    parseProgressStore: parseProgressStore, saveProgressStore: saveProgressStore, touchProgress: touchProgress, findProgressIdx: findProgressIdx, serializeProgressStore: serializeProgressStore,
     pixelsKey: pixelsKey, quantizePattern: quantizePattern, makeQuantCache: makeQuantCache, MAX_PROGRESS: MAX_PROGRESS,
     parseProgress: parseProgress, restoreIdx: restoreIdx, tapestryRows: tapestryRows, c2cDiagonals: c2cDiagonals, diagCells: diagCells,
     PHASE_NAME: PHASE_NAME, formatTapestryLine: formatTapestryLine, formatC2CLine: formatC2CLine
