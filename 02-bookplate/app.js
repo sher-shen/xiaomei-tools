@@ -14,7 +14,7 @@
   setPalette('paper');
   var FH = '"MaShan","Songti SC","STSong","Noto Serif SC",serif';
   var FB = '"Songti SC","STSong","Noto Serif SC",serif';
-  var MAXBOOKS = 30;
+  var MAXBOOKS = 30, MAXTITLE = 100, MAXAUTHOR = 60;
   var LS_KEY = 'bookplate.v1';
 
   var $ = function (id) { return document.getElementById(id); };
@@ -25,7 +25,7 @@
   };
 
   var state = { tpl: 'plate', theme: 'paper', ratings: {}, best: -1, nowm: false };
-  var plateWarn = false;
+  var plateWarn = false, receiptCut = 0;
   var fontsReady = false;
 
   /* ---------- utils ---------- */
@@ -49,11 +49,11 @@
     lines.forEach(function (ln) {
       ln = ln.trim();
       if (!ln) return;
-      total++;
       var p = ln.split(/\s*[\/／]\s*/);
-      var t = (p[0] || '').replace(/[《》]/g, '').trim();
-      var a = (p.slice(1).join(' ') || '').trim();
+      var t = Array.from((p[0] || '').replace(/[《》]/g, '').trim()).slice(0, MAXTITLE).join('');
+      var a = Array.from((p.slice(1).join(' ') || '').trim()).slice(0, MAXAUTHOR).join('');
       if (!t) return;
+      total++;
       if (out.length < MAXBOOKS) out.push({ title: t, author: a });
     });
     return { books: out, total: total };
@@ -189,6 +189,7 @@
       l.addColorStop(0, 'rgba(' + ec + '0.22)'); l.addColorStop(1, 'rgba(' + ec + '0)');
       g.fillStyle = l; g.fillRect(0, 0, w, h);
     });
+    if (w !== 1242) Object.keys(paperCache).forEach(function (k) { if (k.indexOf('1242x') < 0) delete paperCache[k]; });
     paperCache[key] = c;
     return c;
   }
@@ -320,14 +321,14 @@
 
     var cx = W / 2, name = data.owner, cn = cnYear(data.year);
     ctx.fillStyle = INK; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    var y = 235, HEADW = 820, hs, ht;
+    var y = 235, HEADW = 820, ht;
     if (name) {
       // 藏书人过长：先缩字，再截断人名
       var nc = Array.from(name);
       ctx.font = '80px ' + FH;
       while (nc.length > 1 && ctx.measureText(nc.join('') + (nc.length < Array.from(name).length ? '…' : '') + '藏书').width > HEADW) nc.pop();
       ht = nc.join('') + (nc.length < Array.from(name).length ? '…' : '') + '藏书';
-      hs = fitSize(ctx, ht, HEADW, 190, 80, FH);
+      fitSize(ctx, ht, HEADW, 190, 80, FH);
       ctx.fillText(ht, cx, y);
       ctx.fillStyle = RED;
       ctx.font = '50px ' + FH;
@@ -508,11 +509,8 @@
       if (sub) {
         ctx.font = 28 * S + 'px ' + FB;
         var sw = isBest ? 660 : RW - 2 * RPAD - 90;
-        var sl = [truncW(ctx, sub, sw)];
-        sl.forEach(function (l) {
-          ly += 38 * S; ctx.textAlign = 'left'; ctx.fillStyle = INK2; ctx.font = 28 * S + 'px ' + FB;
-          ctx.fillText(l, RPAD + 90, ly);
-        });
+        ly += 38 * S; ctx.textAlign = 'left'; ctx.fillStyle = INK2;
+        ctx.fillText(truncW(ctx, sub, sw), RPAD + 90, ly);
       }
       if (isBest) {
         if (!sub) ly += 38 * S;
@@ -537,7 +535,6 @@
     }
     y += 6; dash(y, INK); y += 20;
 
-    ctx.textAlign = 'left'; ctx.fillStyle = INK; ctx.font = '40px ' + FB;
     function kv(k, v, red) {
       ctx.textAlign = 'left'; ctx.fillStyle = INK; ctx.font = '36px ' + FB; ctx.fillText(k, RPAD, y + 44);
       ctx.textAlign = 'right'; ctx.fillStyle = red ? RED : INK; ctx.fillText(v, RW - RPAD, y + 44);
@@ -571,7 +568,7 @@
       var seal = makeSeal(chars(name || '某').slice(0, 2).concat(['书', '肆']), 170, 21);
       sh = seal.height + 20;
       stampSeal(ctx, seal, RW - RPAD - seal.width / 2 - 10, sealTop + seal.height / 2 + 10, 0.05);
-    } else sh = 190;
+    }
     y = sealTop + Math.max(sh, 190) + 20;
     dash(y); y += 40;
     if (data.wm) {
@@ -608,6 +605,7 @@
       }
       shown = lo; h = Math.round(drawReceiptBody(tmp, data, true, S, shown));
     }
+    receiptCut = shown < data.books.length ? shown : 0;
     var H = h + BAND * 2, cv = els.cv;
     cv.width = RW; cv.height = H;
     var ctx = cv.getContext('2d');
@@ -628,7 +626,7 @@
     ctx.fillStyle = '#efe2bf'; ctx.fill();
     ctx.shadowColor = 'transparent';
     ctx.clip();
-    ctx.drawImage(makePaper(RW, h + 40, 'paper'), 0, BAND - 10);
+    ctx.drawImage(makePaper(RW, Math.ceil((h + 40) / 400) * 400, 'paper'), 0, BAND - 10);
     ctx.translate(0, BAND);
     drawReceiptBody(ctx, data, false, S, shown);
     ctx.restore();
@@ -652,10 +650,11 @@
       try {
         if (state.tpl === 'plate') drawPlate(data); else drawReceipt(data);
         els.status.textContent = '预览已生成（' + els.cv.width + '×' + els.cv.height + '）' +
-          (state.tpl === 'plate' && plateWarn ? '。书目较多，建议用「书单小票」样式' : '');
+          (state.tpl === 'plate' && plateWarn ? '。书目较多，建议用「书单小票」样式' : '') +
+          (state.tpl === 'receipt' && receiptCut ? '。小票过长，仅列出前 ' + receiptCut + ' 本' : '');
         els.cv.setAttribute('aria-label', (state.tpl === 'plate' ? '藏书票' : '书单小票') + '预览，共 ' + data.books.length + ' 本');
       } catch (e) {
-        els.status.textContent = '生成失败：' + e.message;
+        els.status.textContent = '生成失败：' + (e && e.message || e);
       }
     };
     if (fontsReady) { go(); return null; }
@@ -668,9 +667,11 @@
       tasks.push(document.fonts.load('48px MaShan', txt));
       tasks.push(document.fonts.load('48px MaShan', ''));
     } catch (e) {}
-    return Promise.all(tasks).catch(function () {}).then(function () {
+    var wait = Promise.all(tasks).catch(function () {}).then(function () {
       return document.fonts && document.fonts.ready ? document.fonts.ready : null;
     }).catch(function () {});
+    // 字体迟迟不到（离线/加载失败）时 3 秒后用备用字体先出图
+    return Promise.race([wait, new Promise(function (r) { setTimeout(r, 3000); })]);
   }
   function schedule() { clearTimeout(timer); timer = setTimeout(render, 150); }
   var rowTimer = 0;
@@ -680,7 +681,7 @@
   }
 
   /* ---------- book rows ---------- */
-  function buildRows() {
+  function buildRows(focusSel) {
     var p = parseBooks(), box = els.books;
     Object.keys(state.ratings).forEach(function (k) { if (!(+k < p.books.length)) delete state.ratings[k]; });
     if (!(state.best >= 0 && state.best < p.books.length)) state.best = -1;
@@ -695,32 +696,33 @@
     p.books.forEach(function (b, i) {
       var row = document.createElement('div'); row.className = 'brow';
       var t = document.createElement('div'); t.className = 't';
-      t.textContent = (i + 1) + '. ' + b.title; row.appendChild(t);
+      t.textContent = (i + 1) + '. ' + b.title; t.title = b.title; row.appendChild(t);
       var st = document.createElement('div'); st.className = 'stars'; st.setAttribute('role', 'group'); st.setAttribute('aria-label', '《' + b.title + '》评星');
       var cur = state.ratings[i] || 0;
       for (var s = 1; s <= 5; s++) (function (s) {
         var bt = document.createElement('button');
-        bt.type = 'button'; bt.textContent = '★'; bt.setAttribute('aria-label', '《' + b.title + '》评 ' + s + ' 星');
+        bt.type = 'button'; bt.textContent = s <= cur ? '★' : '☆'; bt.setAttribute('data-k', 's' + i + '-' + s); bt.setAttribute('aria-label', '《' + b.title + '》评 ' + s + ' 星');
         bt.setAttribute('aria-pressed', s <= cur ? 'true' : 'false'); bt.title = s + ' 星';
         if (s <= cur) bt.className = 'on';
         bt.addEventListener('click', function () {
           if (state.ratings[i] === s) delete state.ratings[i]; else state.ratings[i] = s;
-          buildRows(); persist(); schedule();
+          buildRows('[data-k="s' + i + '-' + s + '"]'); persist(); schedule();
         });
         st.appendChild(bt);
       })(s);
       row.appendChild(st);
       var lb = document.createElement('label'); lb.className = 'best';
       var rd = document.createElement('input'); rd.type = 'checkbox'; rd.checked = state.best === i;
-      rd.setAttribute('aria-label', '设《' + b.title + '》为年度之书');
+      rd.setAttribute('aria-label', '设《' + b.title + '》为年度之书'); rd.setAttribute('data-k', 'b' + i);
       rd.addEventListener('change', function () {
         state.best = rd.checked ? i : -1;
-        buildRows(); persist(); schedule();
+        buildRows('[data-k="b' + i + '"]'); persist(); schedule();
       });
       lb.appendChild(rd); lb.appendChild(document.createTextNode('年度'));
       row.appendChild(lb);
       box.appendChild(row);
     });
+    if (focusSel) { try { var f = box.querySelector(focusSel); if (f) f.focus(); } catch (e) {} }
   }
 
   /* ---------- persistence ---------- */
@@ -732,23 +734,33 @@
       }));
     } catch (e) {}
   }
+  function cleanRatings(o) {
+    var out = {};
+    if (o && typeof o === 'object') Object.keys(o).forEach(function (k) {
+      var v = Math.round(+o[k]);
+      if (/^\d+$/.test(k) && v >= 1 && v <= 5) out[k] = v;
+    });
+    return out;
+  }
   function restore() {
     try {
       var s = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
       if (!s) return;
+      if (!s || typeof s !== 'object') return;
       if (s.year) els.year.value = s.year;
-      els.owner.value = s.owner || '';
-      els.list.value = s.list || '';
+      els.owner.value = String(s.owner || '').slice(0, 12);
+      els.list.value = String(s.list || '').slice(0, 8000);
       state.tpl = s.tpl === 'receipt' ? 'receipt' : 'plate';
       state.theme = s.theme === 'night' ? 'night' : 'paper';
       state.nowm = !!s.nowm;
       if (s.rv === 2) {
-        state.ratings = s.ratings || {};
-        state.best = typeof s.best === 'number' ? s.best : -1;
+        state.ratings = cleanRatings(s.ratings);
+        state.best = Number.isInteger(s.best) ? s.best : -1;
       } else { // 旧数据以书名为键：按首个同名行迁移
         var tl = parseBooks().books.map(function (b) { return b.title; });
         state.ratings = {};
         Object.keys(s.ratings || {}).forEach(function (k) { var ix = tl.indexOf(k); if (ix >= 0) state.ratings[ix] = s.ratings[k]; });
+        state.ratings = cleanRatings(state.ratings);
         state.best = s.best ? tl.indexOf(s.best) : -1;
       }
     } catch (e) {}
@@ -800,9 +812,19 @@
     a.href = url; a.download = fname;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(function () { try { URL.revokeObjectURL(url); } catch (e) {} }, 10000);
-    els.ovImg.src = canvas.toDataURL('image/png');
-    els.overlay.hidden = false;
-    try { els.ovClose.focus(); } catch (e) {}
+    if (ovUrl) { try { URL.revokeObjectURL(ovUrl); } catch (e) {} }
+    ovUrl = URL.createObjectURL(blob);
+    els.ovImg.src = ovUrl;
+    setOverlay(true);
+  }
+  var ovUrl = '';
+  function setOverlay(open) {
+    els.overlay.hidden = !open;
+    ['top', 'main', 'foot'].forEach(function (c) {
+      var n = document.querySelector('.' + c) || document.querySelector(c);
+      if (n) { if (open) n.setAttribute('inert', ''); else n.removeAttribute('inert'); }
+    });
+    if (open) { try { els.ovClose.focus(); } catch (e) {} }
   }
   function saveCanvas(canvas, filename, btn) {
     if (saving) return;
@@ -832,7 +854,7 @@
         clearTimeout(tm); els.status.textContent = '已交给系统分享。';
       }, function (e) {
         clearTimeout(tm);
-        if (e && e.name === 'AbortError') return;
+        if (e && e.name === 'AbortError') { els.status.textContent = '已取消分享。'; return; }
         fallbackSave(canvas, blob, filename);
       });
     }).catch(function (e) {
@@ -843,13 +865,20 @@
     saveCanvas(els.cv, (state.tpl === 'plate' ? '藏书票-' : '书单小票-') + collect().year + '.png', els.save);
   });
   function closeOv() {
-    els.overlay.hidden = true; els.ovImg.removeAttribute('src');
+    if (els.overlay.hidden) return;
+    setOverlay(false); els.ovImg.removeAttribute('src');
+    if (ovUrl) { try { URL.revokeObjectURL(ovUrl); } catch (e) {} ovUrl = ''; }
     try { els.save.focus(); } catch (e) {}
   }
   els.ovClose.addEventListener('click', closeOv);
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeOv(); });
+  document.addEventListener('keydown', function (e) {
+    if (els.overlay.hidden) return;
+    if (e.key === 'Escape') closeOv();
+    else if (e.key === 'Tab') { e.preventDefault(); try { els.ovClose.focus(); } catch (x) {} } // 弹层内仅一个可聚焦控件
+  });
 
   /* ---------- init ---------- */
+  try { document.fonts.addEventListener('loadingdone', function () { if (fontsReady) schedule(); }); } catch (e) {}
   els.year.value = new Date().getFullYear();
   restore();
   syncTabs();
