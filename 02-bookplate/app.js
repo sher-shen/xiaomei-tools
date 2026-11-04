@@ -756,7 +756,7 @@
       state.nowm = !!s.nowm;
       var m = RatingCore.migrate(s, parseBooks().books); // 一次性迁移旧的按下标/按书名存档
       state.rk = m.rk; state.bk = m.bk;
-      if (s.rv !== 3) persist();
+      if (!(s.rv >= 3)) persist(); // rv>=3 不回写，避免降级覆盖更新版本的存档
     } catch (e) {}
   }
   function syncTabs() {

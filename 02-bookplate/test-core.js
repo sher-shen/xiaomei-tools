@@ -62,4 +62,12 @@ ok(true, '各种损坏存档不抛错且返回合法结构');
 assert.deepStrictEqual(C.migrate({ rv: 3, ratings: { a: 99, b: 'x', d: 3.4 }, best: 7 }, []), { rk: { d: 3 }, bk: '' }); ok(true, '非法星级被清洗');
 assert.deepStrictEqual(C.migrate({ rv: 2, ratings: { 0: 5 } }, null), { rk: {}, bk: '' }); ok(true, 'books 非数组不抛错');
 
+// 第 1 轮加固
+assert.deepStrictEqual(C.migrate({ rv: 3, ratings: { a: true, b: [3], c: {}, d: '4', e: null } }, []).rk, { d: 4 }); ok(true, 'true/数组/对象/null 不算星级');
+m = C.migrate({ rv: 4, ratings: { [k0(0)]: 5 }, best: k0(1) }, books);
+assert.deepStrictEqual(m, { rk: { [k0(0)]: 5 }, bk: k0(1) }); ok(true, '未来版本 rv>3 按键结构读取');
+m = C.migrate({ rv: 2, ratings: { 0: 5, '00': 1, '01': 2 }, best: 0 }, books);
+assert.deepStrictEqual(m.rk, { [k0(0)]: 5 }); ok(true, 'rv2 非规范下标键（00/01）丢弃，不覆盖');
+assert.notStrictEqual(C.baseKey('a\u241fb', 'c'), C.baseKey('a', 'b\u241fc')); ok(true, '书名/作者含分隔符不串键');
+
 console.log(n + ' checks passed');
