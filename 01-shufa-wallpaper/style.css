@@ -4,7 +4,7 @@
 @font-face{font-family:"LiuJianMaoCao";src:url("fonts/LiuJianMaoCao-Regular.woff2") format("woff2");font-display:swap}
 @font-face{font-family:"LongCang";src:url("fonts/LongCang-Regular.woff2") format("woff2");font-display:swap}
 
-:root{--paper:#f4efe4;--card:#faf7ef;--ink:#2b2724;--mute:#8a8277;--line:#ddd5c4;--red:#b3261e}
+:root{--paper:#f4efe4;--card:#faf7ef;--ink:#2b2724;--mute:#6f685d;--line:#ddd5c4;--red:#b3261e}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--paper);color:var(--ink);
@@ -38,7 +38,7 @@ input[type=range]{width:100%;accent-color:var(--red)}
 
 /* 分段选择 */
 .seg{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-.seg label{flex:1 1 calc(50% - 8px);min-width:0}
+.seg label{flex:1 1 calc(50% - 8px);min-width:0;position:relative}
 .seg.mini label{flex:0 0 auto}
 .seg input{position:absolute;opacity:0;pointer-events:none}
 .seg span{display:block;text-align:center;padding:9px 6px;border:1px solid var(--line);background:#fff;font-size:14px;border-radius:2px}
