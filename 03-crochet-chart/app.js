@@ -3,12 +3,14 @@
   'use strict';
   var C = window.XMChart;
   var $ = function (id) { return document.getElementById(id); };
-  var LS_KEY = 'xm_crochet_progress_v1';
+  var LS_KEY = 'xm_crochet_progress_v1';      // 旧版单条
+  var LS_KEY2 = 'xm_crochet_progress_v2';     // 多图纸 LRU
 
   var srcImg = null, srcName = '';
   var S = null;           // 当前生成结果
   var zoom = 0;           // 0 = 适应宽度，否则为倍数
   var curIdx = 0;
+  var quantCache = C.makeQuantCache(4);   // 换技法时复用量化结果，不重跑 k-means
   var timer = null;
 
   // ---------- 输入 ----------
@@ -132,21 +134,8 @@
     var data = cx.getImageData(0, 0, w, h).data, px = [];
     for (var i = 0; i < w * h; i++) px.push([data[i * 4], data[i * 4 + 1], data[i * 4 + 2]]);
 
-    var rgbPal = C.kmeansPalette(px, k, 20240601, 15);
-    var pal;   // [{rgb,hex,name}]
-    if ($('yarn').checked) {
-      pal = C.mapToYarn(rgbPal);
-    } else {
-      pal = rgbPal.map(function (c) { return { rgb: c, hex: C.rgbToHex(c), name: C.nearestName(c) + '系' }; });
-    }
-    var idx = C.assignPixels(px, w, h, pal.map(function (p) { return p.rgb; }), $('dither').checked);
-    if ($('clean').checked) idx = C.cleanIsolated(idx, w, h);
-    var sorted = C.sortByCount(idx, pal);
-    var palette = sorted.palette;
-    if (!$('yarn').checked) {
-      var nn = C.uniqueNames(palette);
-      palette.forEach(function (p, i) { p.name = nn[i]; });
-    }
+    var q = C.quantizePattern(px, { w: w, h: h, k: k, yarn: $('yarn').checked, dither: $('dither').checked, clean: $('clean').checked, seed: 20240601, iter: 15 }, quantCache);
+    var sorted = q, palette = q.palette;
     var tech = $('tech').value;
     var steps = tech === 'c2c' ? C.c2cDiagonals(sorted.indices, w, h) : C.tapestryRows(sorted.indices, w, h);
     var chg = C.colorChanges(steps);
@@ -162,12 +151,17 @@
   function symOf(i) { return C.symbolFor(i); }
 
   // ---------- 进度 ----------
+  function loadStore() {
+    var raw = localStorage.getItem(LS_KEY2);
+    if (raw == null) raw = localStorage.getItem(LS_KEY);   // 迁移旧单条数据
+    return C.parseProgressStore(raw);
+  }
   function restoreProgress() {
     curIdx = 0;
-    try { curIdx = C.restoreIdx(localStorage.getItem(LS_KEY), S.sig, S.steps.length); } catch (e) { /* 忽略 */ }
+    try { curIdx = C.findProgressIdx(loadStore(), S.sig, S.steps.length); } catch (e) { /* 忽略 */ }
   }
   function saveProgress() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ sig: S.sig, idx: curIdx })); } catch (e) { /* 忽略 */ }
+    try { localStorage.setItem(LS_KEY2, C.serializeProgressStore(C.touchProgress(loadStore(), S.sig, curIdx, Date.now()))); } catch (e) { /* 忽略 */ }
   }
 
   // ---------- 渲染 ----------
@@ -472,7 +466,7 @@
   updateLabels();
   // 刷新后有进度但没图：提示重新选图
   try {
-    var po = C.parseProgress(localStorage.getItem(LS_KEY));
+    var po = loadStore()[0];
     if (po) {
       $('resumeHint').textContent = '重新选择同一张图即可接着上次进度（第 ' + (po.idx + 1) + ' ' +
         (/^c2c:/.test(po.sig) ? '条' : '行') + '）。';
