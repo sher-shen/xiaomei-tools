@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>拼豆 / 十字绣图纸</title>
+<meta name="description" content="上传一张图片，按拼豆或 DMC 十字绣色卡生成带色号的格子图纸，统计每种颜色用量，可导出含图例的 PNG。纯本地运行，图片不上传。">
+<meta name="theme-color" content="#f6f1e6">
+<meta property="og:title" content="拼豆 / 十字绣图纸">
+<meta property="og:description" content="图片转拼豆、十字绣图纸，带色号与用量统计，纯本地运行。">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiNmNmYxZTYiLz48ZyBmaWxsPSIjYjgzNzJiIj48Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSI4Ii8+PGNpcmNsZSBjeD0iNDQiIGN5PSIyMCIgcj0iOCIvPjxjaXJjbGUgY3g9IjIwIiBjeT0iNDQiIHI9IjgiLz48L2c+PGNpcmNsZSBjeD0iNDQiIGN5PSI0NCIgcj0iOCIgZmlsbD0iIzJhMjgyNiIvPjxnIGZpbGw9IiNmNmYxZTYiPjxjaXJjbGUgY3g9IjIwIiBjeT0iMjAiIHI9IjMiLz48Y2lyY2xlIGN4PSI0NCIgY3k9IjIwIiByPSIzIi8+PGNpcmNsZSBjeD0iMjAiIGN5PSI0NCIgcj0iMyIvPjxjaXJjbGUgY3g9IjQ0IiBjeT0iNDQiIHI9IjMiLz48L2c+PC9zdmc+">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <h1>拼豆图纸</h1>
+  <p class="sub">拼豆 · 十字绣 · 按色卡出带色号的格子图纸</p>
+</header>
+
+<main>
+  <section class="card" id="drop">
+    <label class="pick" for="file">
+      <span class="pick-main">选择图片</span>
+      <span class="pick-sub">或把图片拖到这里 · 图片只在本机处理，不会上传</span>
+    </label>
+    <input type="file" id="file" accept="image/*">
+    <button class="btn small demo" id="demo">没有图？用示例图试试</button>
+    <div class="srcrow" id="srcrow" hidden>
+      <img id="thumb" class="thumb" alt="原图缩略图">
+      <div id="srcinfo" class="muted"></div>
+    </div>
+  </section>
+
+  <section class="card" id="params">
+    <div class="row">
+      <label for="card">色卡</label>
+      <select id="card"></select>
+    </div>
+    <div class="muted" id="cardInfo"></div>
+
+    <div class="row">
+      <label for="cols">格子宽度（列数）</label>
+      <output id="colsOut">40</output>
+    </div>
+    <input type="range" id="cols" min="20" max="100" value="40">
+    <div class="muted" id="sizeInfo">高度按图片比例自动计算，最多 150 行</div>
+
+    <div class="row">
+      <label for="ncolors">颜色数（最多）</label>
+      <output id="ncolorsOut">12</output>
+    </div>
+    <input type="range" id="ncolors" min="2" max="32" value="12">
+
+    <div class="row">
+      <label for="crop">裁剪</label>
+      <select id="crop">
+        <option value="orig">保持原比例</option>
+        <option value="square">居中裁成正方形</option>
+      </select>
+    </div>
+
+    <div class="checks">
+      <label><input type="checkbox" id="transparent" checked> 透明处留空（PNG 抠图不填豆）</label>
+      <label><input type="checkbox" id="clean" checked> 清理孤立格（单颗异色并入邻色）</label>
+      <label><input type="checkbox" id="dither"> 抖动（过渡更柔和，色块更碎）</label>
+    </div>
+    <button id="gen" class="btn primary" disabled>生成图纸</button>
+    <div id="status" class="muted" role="status"></div>
+  </section>
+
+  <div id="result" hidden>
+    <section class="card" id="chartCard">
+      <h2>图纸</h2>
+      <div class="seg" role="radiogroup" aria-label="格内显示">
+        <label><input type="radio" name="mode" value="code" checked><span>色号</span></label>
+        <label><input type="radio" name="mode" value="sym"><span>符号</span></label>
+        <label><input type="radio" name="mode" value="none"><span>纯色块</span></label>
+      </div>
+      <div class="toolbar">
+        <button class="btn small" id="zoomOut">缩小</button>
+        <button class="btn small" id="zoomFit">适应宽度</button>
+        <button class="btn small" id="zoomIn">放大</button>
+        <span id="focusInfo" class="muted focus-info"></span>
+      </div>
+      <div class="chart-wrap" id="chartWrap"><canvas id="chart"></canvas></div>
+      <div class="muted">粗线每 10 格一条；点下方用量清单里的颜色可单独高亮，再点一次取消。</div>
+      <div class="toolbar">
+        <button class="btn primary grow" id="savePng">保存图纸 PNG（含图例）</button>
+      </div>
+      <div id="saveHint" class="muted"></div>
+    </section>
+
+    <section class="card" id="legendCard">
+      <h2>用量清单</h2>
+      <div id="est" class="muted est"></div>
+      <ul id="legend" class="legend"></ul>
+    </section>
+  </div>
+</main>
+
+<div id="overlay" class="overlay" hidden>
+  <div class="overlay-bar"><span>长按图片，选择“保存图片”</span><button class="btn small" id="closeOv">关闭</button></div>
+  <div class="overlay-body"><img id="ovImg" alt="拼豆图纸"></div>
+</div>
+
+<footer>纯本地运行 · 无网络请求<br>色号取自各品牌公开色号表，屏幕色为近似值，购买前请对照实物色卡</footer>
+
+<script src="palettes.js"></script>
+<script src="bead-core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 OUT="$ROOT/dist"
 mkdir -p "$OUT"
-for d in 00-sandbox-test 01-shufa-wallpaper 02-bookplate 03-crochet-chart; do
+for d in 00-sandbox-test 01-shufa-wallpaper 02-bookplate 03-crochet-chart 04-bead-chart; do
   if [ ! -f "$ROOT/$d/index.html" ]; then
     echo "跳过 $d（目录或 index.html 不存在）"
     continue
