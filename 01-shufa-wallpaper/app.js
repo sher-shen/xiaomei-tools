@@ -313,7 +313,7 @@ async function render() {
   const needWait = !famLoaded[fam] || !famLoaded.MaShanZheng;
   if (needWait) $('fontLoading').hidden = false;
   await Promise.all([loadFont(fam, sample), loadFont('MaShanZheng', seal.join(''))]);
-  if (token !== renderToken) return;
+  if (token !== renderToken) return false;
   $('fontLoading').hidden = true;
 
   if (cv.width !== W) cv.width = W;
@@ -331,6 +331,7 @@ async function render() {
   // 同步小印章预览
   const sp = el.sealPrev, sc = makeSeal(sp.width);
   sp.getContext('2d').clearRect(0, 0, sp.width, sp.height); sp.getContext('2d').drawImage(sc, 0, 0);
+  return true;
 }
 
 // 画单个字：缺字 → 灰色占位
@@ -462,7 +463,7 @@ function closeOverlay() {
   overlayFrom = null;
 }
 async function flushRender() {
-  clearTimeout(timer); await render(); // 保存前总是同步重绘，避免导出旧画面
+  clearTimeout(timer); for (let i = 0; i < 5 && !(await render()); i++); // 保存前总是同步重绘，避免导出旧画面
 }
 // 统一保存：手机（粗指针）优先系统分享，8 秒无响应/出错 → 下载 + 长按保存层
 async function saveCanvas(canvas, filename, btn) {
