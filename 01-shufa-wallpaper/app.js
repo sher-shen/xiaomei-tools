@@ -463,7 +463,9 @@ function closeOverlay() {
   overlayFrom = null;
 }
 async function flushRender() {
-  clearTimeout(timer); for (let i = 0; i < 5 && !(await render()); i++); // 保存前总是同步重绘，避免导出旧画面
+  // 保存前总是同步重绘，避免导出旧画面；render 被新设置作废时返回 false → 重试（最多 20 次）
+  clearTimeout(timer);
+  return window.ShufaCore.retryUntil(render, 20);
 }
 // 统一保存：手机（粗指针）优先系统分享，8 秒无响应/出错 → 下载 + 长按保存层
 async function saveCanvas(canvas, filename, btn) {
@@ -474,7 +476,7 @@ async function saveCanvas(canvas, filename, btn) {
   all.forEach(b => b.disabled = true); btn.textContent = '正在生成…';
   let tid = 0, url = '';
   try {
-    await flushRender();
+    if (!(await flushRender())) { alert('设置仍在变化，画面未能更新到最新，请稍后重试'); return; } // 不导出旧画面
     if (typeof canvas === 'function') canvas = await canvas();
     const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
     if (!blob) { alert('生成失败，请重试'); return; }

@@ -24,7 +24,7 @@
     nowm: $('nowm'), overlay: $('overlay'), ovImg: $('ov-img'), ovClose: $('ov-close'), colorRow: $('color-row')
   };
 
-  var state = { tpl: 'plate', theme: 'paper', ratings: {}, best: -1, nowm: false };
+  var state = { tpl: 'plate', theme: 'paper', ratings: {}, best: -1, nowm: false, rk: {}, bk: '', keys: [] };
   var plateWarn = false, receiptCut = 0;
   var fontsReady = false;
 
@@ -636,6 +636,7 @@
   var timer = 0, token = 0;
   function collect() {
     var p = parseBooks();
+    refreshView(p.books);
     var y = parseInt(els.year.value, 10);
     if (!(y >= 1000 && y <= 9999)) y = new Date().getFullYear();
     return {
@@ -681,10 +682,15 @@
   }
 
   /* ---------- book rows ---------- */
+  // 以稳定键（书名+作者）为准，推导当前下标视图
+  function refreshView(books) {
+    state.keys = RatingCore.assignKeys(books);
+    var v = RatingCore.toIndexView(state.keys, state.rk, state.bk);
+    state.ratings = v.ratings; state.best = v.best;
+  }
   function buildRows(focusSel) {
     var p = parseBooks(), box = els.books;
-    Object.keys(state.ratings).forEach(function (k) { if (!(+k < p.books.length)) delete state.ratings[k]; });
-    if (!(state.best >= 0 && state.best < p.books.length)) state.best = -1;
+    refreshView(p.books);
     els.count.className = 'hint' + (p.total > MAXBOOKS ? ' warn' : '');
     els.count.textContent = p.total ? ('已录入 ' + Math.min(p.total, MAXBOOKS) + ' 本' +
       (p.total > MAXBOOKS ? '，超出 ' + MAXBOOKS + ' 本的部分已忽略' : '')) : '';
@@ -705,7 +711,9 @@
         bt.setAttribute('aria-pressed', s <= cur ? 'true' : 'false'); bt.title = s + ' 星';
         if (s <= cur) bt.className = 'on';
         bt.addEventListener('click', function () {
-          if (state.ratings[i] === s) delete state.ratings[i]; else state.ratings[i] = s;
+          var kk = state.keys[i]; if (!kk) return;
+          if (state.rk[kk] === s) delete state.rk[kk]; else state.rk[kk] = s;
+          state.ratings = RatingCore.toIndexView(state.keys, state.rk, state.bk).ratings;
           buildRows('[data-k="s' + i + '-' + s + '"]'); persist(); schedule();
         });
         st.appendChild(bt);
@@ -715,7 +723,8 @@
       var rd = document.createElement('input'); rd.type = 'checkbox'; rd.checked = state.best === i;
       rd.setAttribute('aria-label', '设《' + b.title + '》为年度之书'); rd.setAttribute('data-k', 'b' + i);
       rd.addEventListener('change', function () {
-        state.best = rd.checked ? i : -1;
+        state.bk = rd.checked ? (state.keys[i] || '') : '';
+        state.best = state.bk ? i : -1;
         buildRows('[data-k="b' + i + '"]'); persist(); schedule();
       });
       lb.appendChild(rd); lb.appendChild(document.createTextNode('年度'));
@@ -730,17 +739,9 @@
     try {
       localStorage.setItem(LS_KEY, JSON.stringify({
         year: els.year.value, owner: els.owner.value, list: els.list.value,
-        tpl: state.tpl, theme: state.theme, ratings: state.ratings, best: state.best, nowm: state.nowm, rv: 2
+        tpl: state.tpl, theme: state.theme, ratings: RatingCore.serialize(state.rk, state.bk).ratings, best: state.bk, nowm: state.nowm, rv: 3
       }));
     } catch (e) {}
-  }
-  function cleanRatings(o) {
-    var out = {};
-    if (o && typeof o === 'object') Object.keys(o).forEach(function (k) {
-      var v = Math.round(+o[k]);
-      if (/^\d+$/.test(k) && v >= 1 && v <= 5) out[k] = v;
-    });
-    return out;
   }
   function restore() {
     try {
@@ -753,16 +754,9 @@
       state.tpl = s.tpl === 'receipt' ? 'receipt' : 'plate';
       state.theme = s.theme === 'night' ? 'night' : 'paper';
       state.nowm = !!s.nowm;
-      if (s.rv === 2) {
-        state.ratings = cleanRatings(s.ratings);
-        state.best = Number.isInteger(s.best) ? s.best : -1;
-      } else { // 旧数据以书名为键：按首个同名行迁移
-        var tl = parseBooks().books.map(function (b) { return b.title; });
-        state.ratings = {};
-        Object.keys(s.ratings || {}).forEach(function (k) { var ix = tl.indexOf(k); if (ix >= 0) state.ratings[ix] = s.ratings[k]; });
-        state.ratings = cleanRatings(state.ratings);
-        state.best = s.best ? tl.indexOf(s.best) : -1;
-      }
+      var m = RatingCore.migrate(s, parseBooks().books); // 一次性迁移旧的按下标/按书名存档
+      state.rk = m.rk; state.bk = m.bk;
+      if (!(typeof s.rv === 'number' && s.rv >= 3)) persist(); // rv>=3 不回写，避免降级覆盖更新版本的存档
     } catch (e) {}
   }
   function syncTabs() {
@@ -795,12 +789,12 @@
   els.demo.addEventListener('click', function () {
     els.list.value = ['红楼梦 / 曹雪芹', '西游记 / 吴承恩', '三国演义 / 罗贯中', '水浒传 / 施耐庵', '呐喊 / 鲁迅', '浮生六记 / 沈复'].join('\n');
     if (!els.owner.value.trim()) els.owner.value = '小美';
-    state.ratings = { 0: 5, 1: 4, 2: 4, 3: 3, 4: 5, 5: 4 };
-    state.best = 0;
+    state.rk = {}; state.bk = '';
+    RatingCore.assignKeys(parseBooks().books).forEach(function (k, i) { state.rk[k] = [5, 4, 4, 3, 5, 4][i]; if (i === 0) state.bk = k; });
     buildRows(); persist(); render();
   });
   els.clear.addEventListener('click', function () {
-    els.list.value = ''; state.ratings = {}; state.best = -1; buildRows(); persist(); render();
+    els.list.value = ''; state.rk = {}; state.bk = ''; state.ratings = {}; state.best = -1; buildRows(); persist(); render();
   });
   var saving = false;
   function setSaving(btn, v) {

@@ -77,4 +77,20 @@ let e = C.estimate('bead', 58, 30, [100, 10]);
 ok(e.boards === 4 && e.sizeCm[0] === 29 && e.perColor[0] === 105 && e.perColor[1] === 13, '拼豆：4 块板、29cm、备量 +5%（至少 +3）');
 e = C.estimate('stitch', 140, 70, [3000, 10]);
 ok(Math.abs(e.sizeCm[0] - 25.4) < 1e-9 && e.perColor[0] === 2 && e.perColor[1] === 1, '十字绣：14ct 140 格 = 25.4cm，线量粗估');
+
+// 7) iOS 画布上限保护
+let q = C.safeCanvasScale(1000, 1000, 2);
+ok(q.scale === 2 && !q.clamped && q.width === 2000, '小画布不缩放');
+q = C.safeCanvasScale(3000, 3000, 2);
+ok(q.clamped && q.width * q.height <= 16e6 && q.width <= 8192, '面积超限时压低缩放（' + q.width + '×' + q.height + '）');
+q = C.safeCanvasScale(500, 20000, 1);
+ok(q.clamped && q.height <= 8192 && q.width >= 1, '单边超 8192 时压低缩放');
+q = C.safeCanvasScale(0, NaN, -1);
+ok(q.width === 1 && q.height === 1 && q.scale > 0, '非法输入不崩溃');
+q = C.safeCanvasScale(1, 100000, 1);
+ok(q.height <= 8192 && q.width >= 1, '极端细长画布宽至少 1');
+q = C.safeCanvasScale(3000, 3000, 2, -5, NaN);
+ok(q.width > 0 && q.height > 0 && q.width * q.height <= 16e6, '非法 maxArea/maxSide 回落默认值（不产生 NaN）');
+q = C.safeCanvasScale(1e8, 1, 1, 16e6, 1e9);
+ok(q.width * q.height <= 16e6, '自定义宽松 maxSide 时面积仍受限（' + q.width + '×' + q.height + '）');
 console.log('\n全部通过 (' + n + ' 项)');

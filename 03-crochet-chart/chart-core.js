@@ -408,6 +408,100 @@
     return (o && o.sig === sig && o.idx < len) ? o.idx : 0;
   }
 
+  /* ---------- 多图纸进度（LRU，最多 MAX_PROGRESS 条） ---------- */
+  var MAX_PROGRESS = 10;
+  /** 解析进度仓库 JSON：{v:2,items:[{sig,idx,t}]}；兼容旧版单条 {sig,idx}；坏数据返回 []（坏条目单独丢弃）。items 新→旧 */
+  function parseProgressStore(raw) {
+    var o;
+    try { o = JSON.parse(raw || 'null'); } catch (e) { return []; }
+    if (!o || typeof o !== 'object') return [];
+    var list = Array.isArray(o.items) ? o.items : (typeof o.sig === 'string' ? [o] : []);
+    var out = [], seen = Object.create(null);
+    list.forEach(function (it) {
+      if (!it || typeof it !== 'object' || typeof it.sig !== 'string' || seen[it.sig]) return;
+      if (typeof it.idx !== 'number' || !isFinite(it.idx) || it.idx < 0 || Math.floor(it.idx) !== it.idx) return;
+      seen[it.sig] = 1;
+      out.push({ sig: it.sig, idx: it.idx, t: (typeof it.t === 'number' && isFinite(it.t)) ? it.t : 0 });
+    });
+    return out.slice(0, MAX_PROGRESS);
+  }
+  /** 记录某图纸进度并置于最前（LRU），返回新数组，超出上限丢最旧 */
+  function touchProgress(items, sig, idx, now, max) {
+    max = max >= 1 ? Math.floor(max) : MAX_PROGRESS;   // 负数/NaN/0 → 默认上限
+    items = Array.isArray(items) ? items : [];
+    if (typeof sig !== 'string') return items.slice(0, max);                        // 无效签名不记录
+    if (typeof idx !== 'number' || !isFinite(idx) || idx < 0) idx = 0;               // NaN/负数不写坏存档
+    idx = Math.floor(idx);
+    var rest = items.filter(function (it) { return it && it.sig !== sig; });
+    rest.unshift({ sig: sig, idx: idx, t: (typeof now === 'number' && isFinite(now)) ? now : 0 });
+    return rest.slice(0, max);
+  }
+  /** 取某图纸的进度下标：存在且未越界才采用，否则 0 */
+  function findProgressIdx(items, sig, len) {
+    for (var i = 0; i < (items || []).length; i++) {
+      if (items[i].sig === sig) return items[i].idx < len ? items[i].idx : 0;
+    }
+    return 0;
+  }
+  function serializeProgressStore(items) { return JSON.stringify({ v: 2, items: items }); }
+  /** 写入进度仓库；write(str) 抛错（如 localStorage 配额满）时从最旧的开始丢，直到写入成功；全部丢完仍失败则不写入。返回实际写入的条数（0=失败） */
+  function saveProgressStore(items, write) {
+    items = (items || []).slice();
+    while (items.length) {
+      try { write(serializeProgressStore(items)); return items.length; } catch (e) { items.pop(); }
+    }
+    return 0;
+  }
+
+  /* ---------- 量化结果缓存（技法不影响，换技法不重跑 k-means） ---------- */
+  function pixelsKey(px) {
+    var h = 5381, h2 = 52711;
+    for (var i = 0; i < px.length; i++) {
+      var p = px[i], v = (p[0] << 16) | (p[1] << 8) | p[2];
+      h = ((h * 33) ^ v) >>> 0; h2 = ((h2 * 31) + v) >>> 0;
+    }
+    return px.length + ':' + h + ':' + h2;
+  }
+  /**
+   * 量化 + 映射色卡 + 分配 + 清理 + 按格数排序 + 命名。与技法无关。
+   * opts: {w,h,k,yarn,dither,clean,seed,iter}；cache: makeQuantCache() 的对象（可省）；
+   * kmeansFn 可注入（测试计数用）。返回 {indices,palette:[{rgb,hex,name}],counts,cached}
+   */
+  function quantizePattern(px, opts, cache, kmeansFn) {
+    kmeansFn = kmeansFn || kmeansPalette;
+    var key = [pixelsKey(px), opts.w, opts.h, opts.k, opts.yarn ? 1 : 0, opts.dither ? 1 : 0, opts.clean ? 1 : 0, opts.seed, opts.iter].join('|');
+    function copy(r, cached) {
+      return {
+        indices: r.indices.slice(), counts: r.counts.slice(), cached: cached,
+        palette: r.palette.map(function (p) { return { rgb: p.rgb.slice(), hex: p.hex, name: p.name }; })
+      };
+    }
+    if (cache && cache.map[key]) { cache.touch(key); return copy(cache.map[key], true); }
+    var rgbPal = kmeansFn(px, opts.k, opts.seed, opts.iter), pal;
+    if (opts.yarn) pal = mapToYarn(rgbPal);
+    else pal = rgbPal.map(function (c) { return { rgb: c, hex: rgbToHex(c), name: nearestName(c) + '系' }; });
+    var idx = assignPixels(px, opts.w, opts.h, pal.map(function (p) { return p.rgb; }), opts.dither);
+    if (opts.clean) idx = cleanIsolated(idx, opts.w, opts.h);
+    var sorted = sortByCount(idx, pal), palette = sorted.palette;
+    if (!opts.yarn) {
+      var nn = uniqueNames(palette);
+      palette.forEach(function (p, i) { p.name = nn[i]; });
+    }
+    var res = { indices: sorted.indices, palette: palette, counts: sorted.counts };
+    if (cache) cache.put(key, res);
+    return copy(res, false);
+  }
+  function makeQuantCache(max) {
+    max = max >= 1 ? Math.floor(max) : 4;   // 负数/NaN → 默认，避免 while 死循环
+    var c = { map: {}, order: [] };
+    c.touch = function (k) { c.order = c.order.filter(function (x) { return x !== k; }); c.order.push(k); };
+    c.put = function (k, v) {
+      c.map[k] = v; c.touch(k);
+      while (c.order.length > max) delete c.map[c.order.shift()];
+    };
+    return c;
+  }
+
   var PHASE_NAME = { inc: '增针段', flat: '平段', dec: '减针段' };
 
   function formatRuns(rs, syms) {
@@ -426,6 +520,8 @@
     YARN: YARN, hexToRgb: hexToRgb, rgbToHex: rgbToHex, rgbToLab: rgbToLab, labDist2: labDist2,
     mulberry32: mulberry32, kmeansPalette: kmeansPalette, mapToYarn: mapToYarn, nearestName: nearestName,
     assignPixels: assignPixels, dedupePixels: dedupePixels, cleanIsolated: cleanIsolated, colorChanges: colorChanges, cropRect: cropRect, chartSize: chartSize, uniqueNames: uniqueNames, sortByCount: sortByCount, symbolFor: symbolFor,
+    parseProgressStore: parseProgressStore, saveProgressStore: saveProgressStore, touchProgress: touchProgress, findProgressIdx: findProgressIdx, serializeProgressStore: serializeProgressStore,
+    pixelsKey: pixelsKey, quantizePattern: quantizePattern, makeQuantCache: makeQuantCache, MAX_PROGRESS: MAX_PROGRESS,
     parseProgress: parseProgress, restoreIdx: restoreIdx, tapestryRows: tapestryRows, c2cDiagonals: c2cDiagonals, diagCells: diagCells,
     PHASE_NAME: PHASE_NAME, formatTapestryLine: formatTapestryLine, formatC2CLine: formatC2CLine
   };

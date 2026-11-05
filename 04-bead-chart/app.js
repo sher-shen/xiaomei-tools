@@ -271,6 +271,7 @@
     var w = S.w, h = S.h, cs = opt.cs || cellSize(), M = 30, x, y, i;
     cv.width = w * cs + M * 2; cv.height = h * cs + M * 2;
     var g = cv.getContext('2d');
+    if (!g) throw new Error('浏览器无法创建画布（可能内存不足），请减少列数后重试');
     g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
     var ox = M, oy = M, f = opt.focus;
     for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
@@ -359,8 +360,13 @@
     colW = Math.floor((W - pad * 2) / cols);
     var rows = Math.ceil(S.colors.length / cols);
     var H = head + chart.height + 56 + rows * rowH + 40;
-    var cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    // iOS Safari 画布上限：面积 ≤16M 像素、单边 ≤8192；超出则整体等比缩小
+    var sc = C.safeCanvasScale(W, H, 1);
+    var cv = document.createElement('canvas'); cv.width = sc.width; cv.height = sc.height;
     var g = cv.getContext('2d');
+    if (!g) throw new Error('浏览器无法创建导出画布（可能内存不足），请减少列数后重试');
+    cv.scaledNote = sc.clamped ? '图纸较大，导出图已缩小到 ' + sc.width + '×' + sc.height + ' 像素（受手机浏览器画布上限限制）。' : '';
+    g.scale(sc.width / W, sc.height / H);
     g.fillStyle = '#fbf8f0'; g.fillRect(0, 0, W, H);
     g.fillStyle = '#b8372b'; g.fillRect(pad, 18, 4, 34);
     g.fillStyle = '#2a2826'; g.textBaseline = 'middle'; g.textAlign = 'left';
@@ -423,14 +429,18 @@
         $('status').textContent = doGenerate();
       }
       cv = exportCanvas();
+      var note = cv.scaledNote ? cv.scaledNote + ' ' : '';
       var fname = (S.card.kind === 'stitch' ? 'cross-stitch-' : 'bead-chart-') + S.w + 'x' + S.h + '.png';
       var fallback = function (blob) {
         var done = false;
         if (blob) { try { downloadBlob(blob, fname); done = true; } catch (e) { done = false; } }
-        openOverlay(cv.toDataURL('image/png'));
-        hint.textContent = done ? '已触发下载；若没有反应，请在全屏图片上长按保存。' : '请在全屏图片上长按保存。';
+        var url = '';
+        try { url = cv.toDataURL('image/png'); } catch (e) { url = ''; }
+        if (!url || url.length < 32) { hint.textContent = note + '导出失败：浏览器无法生成图片，请减少列数或颜色后重试。'; return; }
+        openOverlay(url);
+        hint.textContent = note + (done ? '已触发下载；若没有反应，请在全屏图片上长按保存。' : '请在全屏图片上长按保存。');
       };
-      cv.toBlob(function (blob) {
+      cv.toBlob(function (blob) {   // blob 可能为 null（内存不足），fallback 会改走 dataURL
         try {
           var file = null;
           try { if (blob) file = new File([blob], fname, { type: 'image/png' }); } catch (e) { file = null; }
@@ -444,7 +454,7 @@
           Promise.race([navigator.share({ files: [file], title: '拼豆图纸' }), timeout]).then(function (r) {
             clearTimeout(tm);
             if (r === 'timeout') fallback(blob);
-            else hint.textContent = '已调出系统分享，可选择“存储图像”。';
+            else hint.textContent = note + '已调出系统分享，可选择“存储图像”。';
             finish();
           }, function (e) {
             clearTimeout(tm);
