@@ -10,14 +10,14 @@
     if (!t) return '';
     return t + '␟' + norm(author);
   }
-  // 为每本书分配键；同键重复时按出现顺序加 #2、#3…（确定性）；空书名得 ''
+  // 为每本书分配键；同键重复时按出现顺序加 ␟2、␟3…（确定性；␟ 已被 norm 剔除，不会与作者名如 "#2" 撞键）；空书名得 ''
   function assignKeys(books) {
     var seen = {}, out = [];
     (books || []).forEach(function (b) {
       var k = baseKey(b && b.title, b && b.author);
       if (!k) { out.push(''); return; }
       seen[k] = (seen[k] || 0) + 1;
-      out.push(seen[k] === 1 ? k : k + '#' + seen[k]);
+      out.push(seen[k] === 1 ? k : k + '\u241f' + seen[k]);
     });
     return out;
   }

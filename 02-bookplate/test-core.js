@@ -75,4 +75,11 @@ assert.strictEqual(C.baseKey('红楼梦\u200b', '曹\ufeff雪芹'), C.baseKey('�
 m = C.migrate({ rv: '3', ratings: { [k0(0)]: 5 }, best: k0(0) }, books);
 assert.deepStrictEqual(m, { rk: {}, bk: '' }); ok(true, 'rv 为字符串不当作新版结构（按旧版处理，不误读）');
 
+// 第 3 轮（监工挑刺）：重复书名的序号后缀不得与作者名撞键
+var dup3 = [B('a', ''), B('a', ''), B('a', '#2')];
+var k3 = C.assignKeys(dup3);
+assert.strictEqual(new Set(k3).size, 3); ok(true, '重复项后缀不与作者 "#2" 撞键');
+m = C.migrate({ rv: 2, ratings: { 1: 5, 2: 1 }, best: 2 }, dup3);
+assert.deepStrictEqual(C.toIndexView(k3, m.rk, m.bk), { ratings: { 1: 5, 2: 1 }, best: 2 }); ok(true, '撞键场景迁移后评分/年度之书各归其位');
+
 console.log(n + ' checks passed');
