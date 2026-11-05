@@ -16,7 +16,7 @@
 ## 测试
 ```bash
 node 01-shufa-wallpaper/test-core.js   # 15
-node 02-bookplate/test-core.js         # 27
+node 02-bookplate/test-core.js         # 29
 node 03-crochet-chart/test-core.js     # 62
 node 04-bead-chart/test-core.js        # 31
 ./pack.sh                              # dist/ 应有 5 个 zip
