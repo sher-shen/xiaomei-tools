@@ -28,3 +28,10 @@ node 04-bead-chart/test-core.js        # 31
 
 ## 未实测
 - iOS/微信真机的 canvas 上限与系统分享。
+
+## 当前状态（2026-11-05）
+- 分支 `claude/polish-all-2` 已全部推送，PR 为 [#3](https://github.com/sher-shen/xiaomei-tools/pull/3)（目标 `claude/polish-all`，**未合并，等人工合并**）。
+- 本地四个测试全绿，`./pack.sh` 产出 5 个 zip（`dist/` 已 gitignore，不入库）。
+- 远端分支上有会话之外的人/会话推的提交（00 按钮 44px、03 注释、02 重复书名后缀改用 `␟`）。再推前先 `git fetch` + 变基自己的提交，不要强推。
+- 用户曾反馈“一直下载图片”：本会话验证时 stub 拦截 4 次、真实 download 事件 0，代码里下载只在点保存后触发一次，原因未复现。若再出现，需问清页面、按钮、是点一次多次还是自动重复。
+- 待办/可选：真机（iOS/微信）验证 canvas 上限与分享；03 的 `.small` 缩放按钮 375px 尺寸未逐个量。
