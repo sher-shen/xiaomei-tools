@@ -444,7 +444,7 @@
     return 0;
   }
   function serializeProgressStore(items) { return JSON.stringify({ v: 2, items: items }); }
-  /** 写入进度仓库；write(str) 抛错（如 localStorage 配额满）时从最旧的开始丢，直到写入成功或只剩 1 条。返回实际写入的条数（0=失败） */
+  /** 写入进度仓库；write(str) 抛错（如 localStorage 配额满）时从最旧的开始丢，直到写入成功；全部丢完仍失败则不写入。返回实际写入的条数（0=失败） */
   function saveProgressStore(items, write) {
     items = (items || []).slice();
     while (items.length) {
