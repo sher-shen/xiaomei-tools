@@ -1,6 +1,6 @@
 # SUPERVISOR — xiaomei-tools（监工报告）
 
-**时间**：2026-11-05 02:35–02:45 UTC
+**时间**：2026-11-05 03:35 UTC（上次全量复核 02:45 UTC）
 **结论**：**APPROVED**（上次唯一缺陷已修复并推送到 W；全量复核通过；PR #3 已开、目标 claude/polish-all）
 
 ## 被监督对象
@@ -14,7 +14,12 @@
 2. `8441b6a` 03：`saveProgressStore` 注释修正为「全部丢完仍失败则不写入」（行为不变；已核实 items[0] 为最新、pop 丢最旧）。
 3. `dbb9796` 00：`.btn` min-height 40→44px（与 0679c29 对 01~04 的触控目标一致；实测 5 个按钮均 44px）。
 
-## 已核实的事实（本次在 dbb9796 亲自重跑）
+## 本次（03:35）复核
+- W 仍为 `dbb9796`，无新提交；PR #3 仍 open 未合并，head=dbb9796，base=claude/polish-all
+- 亲自重跑：四个 test-core.js 15/29/62/31 全绿；`./pack.sh` 退出 0，五个 zip 齐全且各含根 index.html
+- 未重跑：375px 浏览器复测（代码自 02:45 复测后未变）
+
+## 已核实的事实（02:45 在 dbb9796 亲自重跑）
 - 四个 test-core.js 全绿：01 = 15 retryUntil cases / 02 = 29 / 03 = 62 / 04 = 31（均 ≥ 基线 5/21/57/29）
 - `./pack.sh` 退出 0，dist/ 五个 zip（00~04）齐全；逐个解压 index.html 在 zip 根，无 test-*.js 入包，02 zip 含 rating-core.js；dist/ 被 gitignore，未入库
 - shared/ 未抽取（README 已说明理由），页面不引用 shared → zip 独立运行成立，pack.sh 无需改
@@ -37,3 +42,4 @@
 ## 历史
 - 2026-11-05 01:50 UTC：首次运行。测试 15/27/62/31 全绿、pack 五 zip 齐全、375px 五页通过；发现 02 撞键缺陷，补丁推 W 被拒 → NOT_APPROVED。
 - 2026-11-05 02:45 UTC：接手推送 d8b7149/8441b6a/dbb9796（02 撞键修复+测试、03 注释、00 按钮 44px）；复测 15/29/62/31、五 zip、375px 五页全过；PR #3 open → APPROVED。
+- 2026-11-05 03:35 UTC：W 无变化（dbb9796），PR #3 open；重跑测试 15/29/62/31、pack 五 zip 通过 → 维持 APPROVED，未改代码。
