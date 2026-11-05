@@ -1,10 +1,10 @@
 # SUPERVISOR — xiaomei-tools（监工报告）
 
-**时间**：2026-11-05 07:36 UTC（上次全量复核 02:45 UTC）
+**时间**：2026-11-05 21:36 UTC（上次全量复核 02:45 UTC）
 **结论**：**APPROVED**（上次唯一缺陷已修复并推送到 W；全量复核通过；PR #3 已开、目标 claude/polish-all）
 
 ## 被监督对象
-- W = `claude/polish-all-2`，最新 `dbb9796`（2026-11-05 02:37 UTC，本次监工接手提交）；干活的最后一次提交仍是 `fcf7372`（11-04 20:54 UTC）
+- W = `claude/polish-all-2`，最新 `c37bec6`（2026-11-05 08:41 UTC，干活的新增 3 个仅 CLAUDE.md 的提交 9232f07/380ea4b/c37bec6）；代码最后变更仍是 `dbb9796`
 - PR #3：`claude/polish-all-2 → claude/polish-all`，open，未合并（目标正确，非 main）；PR #1/#2 也均 open 未合并
 - main 最新提交仍是 2026-10-12，未被推送
 
@@ -14,10 +14,12 @@
 2. `8441b6a` 03：`saveProgressStore` 注释修正为「全部丢完仍失败则不写入」（行为不变；已核实 items[0] 为最新、pop 丢最旧）。
 3. `dbb9796` 00：`.btn` min-height 40→44px（与 0679c29 对 01~04 的触控目标一致；实测 5 个按钮均 44px）。
 
-## 本次（07:36）复核
-- W 仍为 `dbb9796`，无新提交；PR #3 仍 open 未合并，head=dbb9796，base=claude/polish-all
-- 亲自重跑：四个 test-core.js 15/29/62/31 全绿（node 退出码均 0）；`./pack.sh` 退出 0，五个 zip 齐全且各含根 index.html；main 仍为 2065839
-- 未重跑：375px 浏览器复测（代码自 02:45 复测后未变）
+## 本次（21:36）复核
+- dbb9796..c37bec6 只新增根目录 CLAUDE.md（37 行文档）：红线/结构决定/测试数 15/29/62/31 与实际一致；不进入任何 zip；无运行时外部请求（仅文档内 PR 链接）
+- PR #3 open 未合并，head=c37bec6，base=claude/polish-all；PR #1/#2 open；main 仍为 2065839
+- 亲自重跑：四个 test-core.js 15/29/62/31 全绿（退出码 0）；`./pack.sh` 退出 0，五个 zip 齐全、各含根 index.html、无 test-*.js
+- 未重跑：375px 浏览器复测（页面代码自 02:45 复测后未变）
+- W 超 70 分钟无提交，但待办已完成且 PR 已开 → 不接手、不改代码
 
 ## 已核实的事实（02:45 在 dbb9796 亲自重跑）
 - 四个 test-core.js 全绿：01 = 15 retryUntil cases / 02 = 29 / 03 = 62 / 04 = 31（均 ≥ 基线 5/21/57/29）
@@ -48,3 +50,4 @@
 - 2026-11-05 05:36 UTC：W 无变化（dbb9796），PR #3 open 未合并，main 未动；重跑测试 15/29/62/31、pack 五 zip（各含根 index.html）通过 → 维持 APPROVED，未改代码。
 - 2026-11-05 06:36 UTC：W 无变化（dbb9796），PR #3 open 未合并，main 未动；重跑测试 15/29/62/31、pack 五 zip（各含根 index.html）通过 → 维持 APPROVED，未改代码。
 - 2026-11-05 07:36 UTC：W 无变化（dbb9796），PR #3 open 未合并，main 未动；重跑测试 15/29/62/31（退出码 0）、pack 五 zip（各含根 index.html）通过 → 维持 APPROVED，未改代码。
+- 2026-11-05 21:36 UTC：W 新增 3 个 CLAUDE.md 文档提交（c37bec6），内容与实际一致；PR #3 open 未合并，main 未动；重跑测试 15/29/62/31、pack 五 zip 通过 → 维持 APPROVED，未改代码。
